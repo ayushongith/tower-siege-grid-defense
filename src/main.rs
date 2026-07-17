@@ -1,4 +1,4 @@
-﻿//! Tower Siege: Grid Defense — Day 1 enemy pathing layer.
+﻿//! Tower Siege: Grid Defense — Day 1 input + state transitions.
 
 mod components;
 mod plugins;
@@ -7,7 +7,7 @@ mod utils;
 
 use bevy::prelude::*;
 
-use plugins::{EnemyPlugin, MapPlugin};
+use plugins::{EnemyPlugin, InputPlugin, MapPlugin};
 use resources::{GameStats, WaveManager};
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -34,11 +34,7 @@ fn main() {
         .init_resource::<GameStats>()
         .init_resource::<WaveManager>()
         .init_state::<AppState>()
-        .add_plugins((MapPlugin, EnemyPlugin))
-        // Enter Playing immediately so enemy systems are active for later input.
-        .add_systems(Startup, |mut next: ResMut<NextState<AppState>>| {
-            next.set(AppState::Playing);
-        })
+        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin))
         .add_systems(Startup, setup_camera)
         .run();
 }
