@@ -1,4 +1,6 @@
-//! Tower Siege: Grid Defense — project scaffold (Day 1, step 1).
+﻿//! Tower Siege: Grid Defense — Day 1 components layer.
+
+mod components;
 
 use bevy::prelude::*;
 
