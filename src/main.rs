@@ -1,10 +1,22 @@
-﻿//! Tower Siege: Grid Defense — Day 1 data layer (resources + grid utils).
+﻿//! Tower Siege: Grid Defense — Day 1 map visuals layer.
 
 mod components;
+mod plugins;
 mod resources;
 mod utils;
 
 use bevy::prelude::*;
+
+use plugins::MapPlugin;
+use resources::{GameStats, WaveManager};
+
+#[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum AppState {
+    #[default]
+    MainMenu,
+    Playing,
+    Paused,
+}
 
 fn main() {
     App::new()
@@ -19,12 +31,18 @@ fn main() {
             }),
         )
         .insert_resource(ClearColor(Color::srgb(0.12, 0.16, 0.12)))
-        .init_resource::<resources::GameStats>()
-        .init_resource::<resources::WaveManager>()
+        .init_resource::<GameStats>()
+        .init_resource::<WaveManager>()
+        .init_state::<AppState>()
+        .add_plugins(MapPlugin)
         .add_systems(Startup, setup_camera)
         .run();
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(Camera2d);
+    commands.spawn((
+        Camera2d,
+        Transform::from_xyz(0.0, 0.0, 1000.0),
+        Name::new("MainCamera"),
+    ));
 }
