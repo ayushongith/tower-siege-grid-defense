@@ -1,6 +1,8 @@
-﻿//! Tower Siege: Grid Defense — Day 1 components layer.
+﻿//! Tower Siege: Grid Defense — Day 1 data layer (resources + grid utils).
 
 mod components;
+mod resources;
+mod utils;
 
 use bevy::prelude::*;
 
@@ -17,6 +19,8 @@ fn main() {
             }),
         )
         .insert_resource(ClearColor(Color::srgb(0.12, 0.16, 0.12)))
+        .init_resource::<resources::GameStats>()
+        .init_resource::<resources::WaveManager>()
         .add_systems(Startup, setup_camera)
         .run();
 }
