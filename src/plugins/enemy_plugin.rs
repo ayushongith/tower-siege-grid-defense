@@ -9,7 +9,7 @@
 use bevy::prelude::*;
 
 use crate::components::{Enemy, EnemyType, Health, PathFollower, Position};
-use crate::resources::{Map, WaveManager};
+use crate::resources::{GameStats, Map, WaveManager};
 use crate::AppState;
 
 /// Event-like resource flag set by InputPlugin when the player presses Space.
@@ -99,6 +99,7 @@ fn move_path_followers(
     time: Res<Time>,
     map: Res<Map>,
     mut commands: Commands,
+    mut stats: ResMut<GameStats>,
     mut query: Query<(Entity, &mut Transform, &mut Enemy), With<PathFollower>>,
 ) {
     let path = &map.path;
@@ -111,9 +112,10 @@ fn move_path_followers(
     for (entity, mut transform, mut enemy) in &mut query {
         // Already past the last segment → arrived.
         if enemy.waypoint_index >= path.len() - 1 {
+            stats.lives = stats.lives.saturating_sub(1);
             info!(
-                "Enemy {:?} reached base (despawning)",
-                enemy.enemy_type
+                "Enemy {:?} reached base! Lives remaining: {}",
+                enemy.enemy_type, stats.lives
             );
             commands.entity(entity).despawn_recursive();
             continue;
@@ -149,9 +151,10 @@ fn move_path_followers(
         }
 
         if enemy.waypoint_index >= path.len() - 1 {
+            stats.lives = stats.lives.saturating_sub(1);
             info!(
-                "Enemy {:?} reached base (despawning)",
-                enemy.enemy_type
+                "Enemy {:?} reached base! Lives remaining: {}",
+                enemy.enemy_type, stats.lives
             );
             // Snap to final point for one clean frame if needed, then remove.
             if let Some(last) = path.last() {

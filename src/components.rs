@@ -158,3 +158,93 @@ pub struct BaseMarker;
 /// Marker for path waypoint dots (debug / readability).
 #[derive(Component, Debug)]
 pub struct PathWaypointMarker;
+
+// ---------------------------------------------------------------------------
+// Towers (Day 2)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TowerType {
+    Arrow,
+    Cannon,
+}
+
+impl TowerType {
+    pub fn cost(self) -> u32 {
+        match self {
+            TowerType::Arrow => 50,
+            TowerType::Cannon => 100,
+        }
+    }
+
+    pub fn range(self) -> f32 {
+        match self {
+            TowerType::Arrow => 150.0,
+            TowerType::Cannon => 120.0,
+        }
+    }
+
+    pub fn damage(self) -> f32 {
+        match self {
+            TowerType::Arrow => 15.0,
+            TowerType::Cannon => 40.0,
+        }
+    }
+
+    pub fn fire_rate(self) -> f32 {
+        match self {
+            TowerType::Arrow => 1.0,
+            TowerType::Cannon => 2.0,
+        }
+    }
+
+    pub fn color(self) -> Color {
+        match self {
+            TowerType::Arrow => Color::srgb(0.20, 0.75, 0.40),
+            TowerType::Cannon => Color::srgb(0.75, 0.30, 0.20),
+        }
+    }
+}
+
+#[derive(Component, Debug, Clone)]
+pub struct Tower {
+    pub tower_type: TowerType,
+    pub range: f32,
+    pub damage: f32,
+    pub fire_rate: f32,
+    pub cooldown: Timer,
+    pub targeting_pos: Vec2,
+}
+
+impl Tower {
+    pub fn new(tower_type: TowerType) -> Self {
+        Self {
+            tower_type,
+            range: tower_type.range(),
+            damage: tower_type.damage(),
+            fire_rate: tower_type.fire_rate(),
+            cooldown: Timer::from_seconds(tower_type.fire_rate(), TimerMode::Repeating),
+            targeting_pos: Vec2::ZERO,
+        }
+    }
+}
+
+/// Marker for tower range preview circle.
+#[derive(Component, Debug)]
+pub struct TowerRangePreview;
+
+// ---------------------------------------------------------------------------
+// Projectiles (Day 2)
+// ---------------------------------------------------------------------------
+
+#[derive(Component, Debug, Clone)]
+pub struct Projectile {
+    pub target_pos: Vec2,
+    pub speed: f32,
+    pub damage: f32,
+}
+
+#[derive(Resource, Debug, Default)]
+pub struct TowerSelection {
+    pub selected: Option<TowerType>,
+}

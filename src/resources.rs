@@ -16,8 +16,7 @@ use serde::{Deserialize, Serialize};
 // Economy / run stats
 // ---------------------------------------------------------------------------
 
-/// Player-facing run statistics. Day 1 only displays conceptually;
-/// Day 2+ will spend gold and decrement lives at the base.
+/// Player-facing run statistics.
 #[derive(Resource, Debug, Clone)]
 pub struct GameStats {
     pub gold: u32,

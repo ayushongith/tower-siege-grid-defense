@@ -1,18 +1,10 @@
-//! InputPlugin — keyboard / mouse → game intents for Day 1.
-//!
-//! We translate raw input into either:
-//! - `NextState<AppState>` transitions (menu / play / pause)
-//! - `SpawnEnemyRequest` flags consumed by EnemyPlugin
-//!
-//! Keeping input separate from enemy mesh spawning preserves a clean boundary
-//! between "what the player asked for" and "how the world fulfills it".
-
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::components::EnemyType;
+use crate::components::{EnemyType, TowerSelection, TowerType};
 use crate::plugins::enemy_plugin::SpawnEnemyRequest;
-use crate::resources::Map;
+use crate::plugins::tower_plugin::{find_tower_placement, spawn_tower};
+use crate::resources::{GameStats, Map};
 use crate::utils::world_to_grid;
 use crate::AppState;
 
@@ -20,18 +12,24 @@ pub struct InputPlugin;
 
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (
-                handle_main_menu_input.run_if(in_state(AppState::MainMenu)),
-                handle_playing_input.run_if(in_state(AppState::Playing)),
-                handle_paused_input.run_if(in_state(AppState::Paused)),
-            ),
-        );
+        app.init_resource::<TowerSelection>()
+            .add_systems(
+                Update,
+                (
+                    handle_main_menu_input.run_if(in_state(AppState::MainMenu)),
+                    (
+                        handle_escape_and_tower_select,
+                        handle_spawn_keys,
+                        handle_mouse_playing,
+                    )
+                        .chain()
+                        .run_if(in_state(AppState::Playing)),
+                    handle_paused_input.run_if(in_state(AppState::Paused)),
+                ),
+            );
     }
 }
 
-/// Main menu: Enter or Space starts the match.
 fn handle_main_menu_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<AppState>>,
@@ -42,26 +40,35 @@ fn handle_main_menu_input(
     }
 }
 
-/// Playing controls:
-/// - Space → spawn a test Normal enemy
-/// - 1/2/3 → spawn Normal / Fast / Tank
-/// - Escape → pause
-/// - LMB → print grid coordinate under cursor
-fn handle_playing_input(
+fn handle_escape_and_tower_select(
     keys: Res<ButtonInput<KeyCode>>,
-    mouse: Res<ButtonInput<MouseButton>>,
     mut next_state: ResMut<NextState<AppState>>,
-    mut spawn_request: ResMut<SpawnEnemyRequest>,
-    windows: Query<&Window, With<PrimaryWindow>>,
-    camera_q: Query<(&Camera, &GlobalTransform)>,
-    map: Res<Map>,
+    mut tower_sel: ResMut<TowerSelection>,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
-        info!("Playing → Paused");
-        next_state.set(AppState::Paused);
-        return;
+        if tower_sel.selected.is_some() {
+            tower_sel.selected = None;
+            info!("Tower selection cleared");
+        } else {
+            info!("Playing → Paused");
+            next_state.set(AppState::Paused);
+        }
     }
 
+    if keys.just_pressed(KeyCode::Digit4) {
+        tower_sel.selected = Some(TowerType::Arrow);
+        info!("Selected Arrow tower (cost: {})", TowerType::Arrow.cost());
+    }
+    if keys.just_pressed(KeyCode::Digit5) {
+        tower_sel.selected = Some(TowerType::Cannon);
+        info!("Selected Cannon tower (cost: {})", TowerType::Cannon.cost());
+    }
+}
+
+fn handle_spawn_keys(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut spawn_request: ResMut<SpawnEnemyRequest>,
+) {
     if keys.just_pressed(KeyCode::Space) {
         spawn_request.pending = true;
         spawn_request.enemy_type = EnemyType::Normal;
@@ -78,13 +85,41 @@ fn handle_playing_input(
         spawn_request.pending = true;
         spawn_request.enemy_type = EnemyType::Tank;
     }
+}
 
-    if mouse.just_pressed(MouseButton::Left) {
-        debug_print_grid_click(&windows, &camera_q, &map);
+fn handle_mouse_playing(
+    mouse: Res<ButtonInput<MouseButton>>,
+    tower_sel: Res<TowerSelection>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut map: ResMut<Map>,
+    mut stats: ResMut<GameStats>,
+    windows: Query<&Window, With<PrimaryWindow>>,
+    camera_q: Query<(&Camera, &GlobalTransform)>,
+) {
+    if !mouse.just_pressed(MouseButton::Left) {
+        return;
+    }
+
+    if let Some(tower_type) = tower_sel.selected {
+        if let Some((col, row)) = find_tower_placement(&windows, &camera_q, &*map) {
+            spawn_tower(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &mut map,
+                &mut stats,
+                col,
+                row,
+                tower_type,
+            );
+        }
+    } else {
+        debug_print_grid_click(&windows, &camera_q, &*map);
     }
 }
 
-/// Paused: Escape resumes.
 fn handle_paused_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<AppState>>,
@@ -118,9 +153,7 @@ fn debug_print_grid_click(
     match world_to_grid(world, map.width, map.height) {
         Some((col, row)) => {
             let tile = map.get_tile(col, row);
-            info!(
-                "Mouse click → grid ({col}, {row}), tile={tile:?}, world={world}"
-            );
+            info!("Mouse click → grid ({col}, {row}), tile={tile:?}, world={world}");
         }
         None => {
             info!("Mouse click outside map at world={world}");

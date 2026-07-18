@@ -19,7 +19,8 @@ mod utils;
 
 use bevy::prelude::*;
 
-use plugins::{EnemyPlugin, InputPlugin, MapPlugin};
+use components::TowerSelection;
+use plugins::{EnemyPlugin, InputPlugin, MapPlugin, ProjectilePlugin, TowerPlugin};
 use resources::{GameStats, WaveManager};
 
 // ---------------------------------------------------------------------------
@@ -65,7 +66,7 @@ fn main() {
         // --- States ----------------------------------------------------------
         .init_state::<AppState>()
         // --- Domain plugins --------------------------------------------------
-        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin))
+        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin))
         // --- Bootstrap systems ----------------------------------------------
         .add_systems(Startup, (setup_camera, setup_menu_ui))
         .add_systems(OnEnter(AppState::Playing), hide_menu_ui)
@@ -130,7 +131,7 @@ fn setup_menu_ui(mut commands: Commands) {
                 TextColor(Color::srgb(0.95, 0.92, 0.80)),
             ));
             parent.spawn((
-                Text::new("Day 1 — Foundation"),
+                Text::new("Day 2 — Towers & Combat"),
                 TextFont {
                     font_size: 24.0,
                     ..default()
@@ -147,7 +148,7 @@ fn setup_menu_ui(mut commands: Commands) {
             ));
             parent.spawn((
                 Text::new(
-                    "In-game: SPACE / 1 / 2 / 3 spawn enemies · ESC pause · LMB grid debug",
+                    "SPACE/1/2/3 spawn · 4=Arrow(50g) · 5=Cannon(100g) · LMB place tower · ESC pause",
                 ),
                 TextFont {
                     font_size: 16.0,
@@ -230,13 +231,18 @@ fn hide_paused_banner(mut query: Query<&mut Visibility, With<PauseBanner>>) {
 fn update_hud(
     stats: Res<GameStats>,
     waves: Res<WaveManager>,
+    tower_sel: Res<TowerSelection>,
     mut hud: Query<(&mut Text, &mut Visibility), With<HudText>>,
 ) {
     for (mut text, mut vis) in &mut hud {
         *vis = Visibility::Visible;
+        let tower_hint = match tower_sel.selected {
+            Some(t) => format!(" [placing {:?} tower - click buildable tile]", t),
+            None => "".to_string(),
+        };
         *text = Text::new(format!(
-            "Gold: {}   Lives: {}   Wave: {}   Spawned: {}   |  SPACE spawn · ESC pause",
-            stats.gold, stats.lives, stats.current_wave, waves.enemies_spawned
+            "Gold: {}   Lives: {}   Wave: {}   Spawned: {}{}",
+            stats.gold, stats.lives, stats.current_wave, waves.enemies_spawned, tower_hint
         ));
     }
 }

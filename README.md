@@ -1,6 +1,6 @@
 # Tower Siege: Grid Defense
 
-A **2D tower defense game** built with **Rust** and the **Bevy 0.15** game engine. This repository contains Day 1 of a planned 5-day build: a complete, runnable foundation featuring a visible grid map, enemy pathfinding, and core game state management.
+A **2D tower defense game** built with **Rust** and the **Bevy 0.15** game engine. This repository contains Days 1-2 of a planned 5-day build: a complete, runnable foundation with tower placement, projectile combat, and economy systems.
 
 ---
 
@@ -69,8 +69,10 @@ cargo run
 | **1** | Spawn a Normal enemy |
 | **2** | Spawn a Fast enemy |
 | **3** | Spawn a Tank enemy |
-| **Escape** | Toggle pause / resume |
-| **Left Click** | Debug-print grid cell under cursor (see terminal output) |
+| **4** | Select Arrow tower (50g, place with click) |
+| **5** | Select Cannon tower (100g, place with click) |
+| **Escape** | Clear tower selection / toggle pause |
+| **Left Click** | Place selected tower on Buildable tile, or debug-print grid cell |
 
 ---
 
@@ -85,8 +87,10 @@ The project follows Bevy's **Entity Component System (ECS)** pattern, organized 
 | `resources.rs` | Global game resources (`GameStats`, `WaveManager`, `Map` with `TileType` grid) |
 | `utils.rs` | Coordinate conversion utilities (`world_to_grid`, `grid_to_world`) |
 | `plugins/map_plugin.rs` | Grid generation, path definition, tile rendering and coloring |
-| `plugins/enemy_plugin.rs` | Enemy spawning, waypoint-based path following, despawning at base |
+| `plugins/enemy_plugin.rs` | Enemy spawning, waypoint-based path following, lives on base-reach |
 | `plugins/input_plugin.rs` | Keyboard and mouse input handling for all game states |
+| `plugins/tower_plugin.rs` | Tower placement, targeting nearest enemy, projectile spawning |
+| `plugins/projectile_plugin.rs` | Projectile movement, collision, damage application, gold rewards |
 
 ### Game States
 
@@ -100,8 +104,9 @@ MainMenu → Playing → Paused
 
 ---
 
-## Day 1 Feature Set
+## Feature Set
 
+### Day 1 — Foundation ✓
 - **Bevy 0.15** app with custom window title ("Tower Siege: Grid Defense"), clear color, and 1280×720 resolution
 - **State-driven UI**: Main menu, playing HUD (gold, lives, wave number, enemy count), and pause overlay
 - **15×10 tile grid** centered in world space (`TILE_SIZE = 64` px)
@@ -111,9 +116,16 @@ MainMenu → Playing → Paused
   - *Fast* — higher speed, lower health
   - *Tank* — slower, higher health
 - **Smooth waypoint following** using linear interpolation along path segments
-- **Enemy lifecycle**: spawn at entrance → traverse path → despawn at base (logged to terminal)
-- **Grid debug**: click any tile to print its type and coordinates
-- **Clean plugin-based architecture** extensible for future days
+
+### Day 2 — Towers & Combat ✓
+- **Two tower types**: Arrow (50g, fast fire) and Cannon (100g, heavy damage)
+- **Tower placement**: select tower type (4/5), click any **Buildable** tile
+- **Economy**: gold deducted on placement, **Occupied** tile state prevents stacking
+- **Auto-targeting**: towers acquire the nearest enemy within range each frame
+- **Projectile system**: homing projectiles fired from towers toward targets
+- **Damage & kills**: projectiles apply damage on arrival; enemies award gold on death
+- **Lives system**: enemies reaching the base decrement lives (shown in HUD)
+- **Tower selection HUD**: displays active tower type in the status bar
 
 ---
 
@@ -134,9 +146,11 @@ tower-siege-grid-defense/
     ├── utils.rs            # Coordinate conversion helpers
     └── plugins/
         ├── mod.rs          # Plugin module exports
-        ├── map_plugin.rs   # Grid map generation and rendering
-        ├── enemy_plugin.rs # Enemy spawning and path-following
-        └── input_plugin.rs # Input handling
+        ├── map_plugin.rs           # Grid map generation and rendering
+        ├── enemy_plugin.rs         # Enemy spawning and path-following
+        ├── input_plugin.rs         # Input handling
+        ├── tower_plugin.rs         # Tower placement, targeting, shooting
+        └── projectile_plugin.rs    # Projectile movement and damage
 ```
 
 ---
@@ -151,9 +165,13 @@ When you run `cargo run`, confirm the following:
 - [x] A visible 15×10 grid is rendered with a winding path
 - [x] A **Spawn** marker (blue) and **Base** marker (gold) are visible
 - [x] Pressing **Space**, **1**, **2**, or **3** spawns enemies that traverse the path smoothly
-- [x] Enemies disappear upon reaching the base (logged to terminal)
+- [x] Enemies disappear upon reaching the base (decrements lives, logged to terminal)
 - [x] **Escape** pauses and resumes the game
-- [x] Left-clicking a tile prints its grid cell and type to the terminal
+- [x] **4** selects Arrow tower, **5** selects Cannon tower (shown in HUD)
+- [x] Click a **Buildable** tile to place a tower (gold deducted, tile turns Occupied)
+- [x] Towers automatically target and fire projectiles at nearby enemies
+- [x] Enemies die from projectile damage and award gold
+- [x] Left-clicking a non-buildable tile prints its grid cell and type
 
 ---
 
@@ -162,15 +180,23 @@ When you run `cargo run`, confirm the following:
 ### Day 1 ✓ (Complete)
 Foundation: grid, path, enemies, game states, HUD
 
-### Day 2 — Planned
-- Tower placement on **Buildable** tiles (click to build)
-- Gold cost system + `Occupied` tile state
-- Projectile or hitscan damage system
-- Lives system (decrement when enemies reach base)
-- Multiple tower types (e.g., Arrow, Cannon)
+### Day 2 ✓ (Complete)
+Towers, projectiles, economy, lives, tower types
 
-### Day 3-5 — TBD
-Wave system, upgrades, UI polish, audio, and more.
+### Day 3 — Planned
+- Auto-scaling wave system with timed enemy spawns
+- Wave start/end UI and wave counter
+- Wave compositions (mixed enemy types per wave)
+
+### Day 4 — Planned
+- Tower upgrades (range, damage, fire rate)
+- Tower sell-back
+- Visual feedback (health bars, hit effects)
+
+### Day 5 — Planned
+- Game over / victory states
+- Audio (SFX + background)
+- Polish, balancing, and release
 
 ---
 
