@@ -20,7 +20,10 @@ mod utils;
 use bevy::prelude::*;
 
 use components::TowerSelection;
-use plugins::{EnemyPlugin, InputPlugin, MapPlugin, ProjectilePlugin, TowerPlugin};
+use plugins::{
+    wave_plugin::WaveAnnouncement, EnemyPlugin, InputPlugin, MapPlugin, ProjectilePlugin,
+    TowerPlugin, WavePlugin,
+};
 use resources::{GameStats, WaveManager};
 
 // ---------------------------------------------------------------------------
@@ -66,7 +69,7 @@ fn main() {
         // --- States ----------------------------------------------------------
         .init_state::<AppState>()
         // --- Domain plugins --------------------------------------------------
-        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin))
+        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, WavePlugin))
         // --- Bootstrap systems ----------------------------------------------
         .add_systems(Startup, (setup_camera, setup_menu_ui))
         .add_systems(OnEnter(AppState::Playing), hide_menu_ui)
@@ -75,7 +78,11 @@ fn main() {
         .add_systems(OnExit(AppState::Paused), hide_paused_banner)
         .add_systems(
             Update,
-            update_hud.run_if(in_state(AppState::Playing).or(in_state(AppState::Paused))),
+            (
+                update_hud,
+                update_wave_announcement,
+            )
+                .run_if(in_state(AppState::Playing).or(in_state(AppState::Paused))),
         )
         .run();
 }
@@ -103,6 +110,9 @@ struct PauseBanner;
 
 #[derive(Component)]
 struct HudText;
+
+#[derive(Component)]
+struct WaveAnnouncementText;
 
 fn setup_menu_ui(mut commands: Commands) {
     // Root UI node covering the window.
@@ -177,6 +187,24 @@ fn setup_menu_ui(mut commands: Commands) {
         Name::new("HudText"),
     ));
 
+    // Wave announcement (shown briefly at wave start/complete).
+    commands.spawn((
+        WaveAnnouncementText,
+        Text::new(""),
+        TextFont {
+            font_size: 36.0,
+            ..default()
+        },
+        TextColor(Color::srgb(1.0, 0.90, 0.40)),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(80.0),
+            left: Val::Percent(50.0),
+            ..default()
+        },
+        Name::new("WaveAnnouncement"),
+    ));
+
     // Pause banner (toggled on pause enter/exit).
     commands
         .spawn((
@@ -240,9 +268,27 @@ fn update_hud(
             Some(t) => format!(" [placing {:?} tower - click buildable tile]", t),
             None => "".to_string(),
         };
+        let wave_info = if waves.total_enemies > 0 {
+            format!(
+                "Enemies: {}/{}",
+                waves.spawn_index.min(waves.total_enemies),
+                waves.total_enemies
+            )
+        } else {
+            "Enemies: 0".to_string()
+        };
         *text = Text::new(format!(
-            "Gold: {}   Lives: {}   Wave: {}   Spawned: {}{}",
-            stats.gold, stats.lives, stats.current_wave, waves.enemies_spawned, tower_hint
+            "Gold: {}   Lives: {}   Wave: {}   {}   Spawned: {}{}",
+            stats.gold, stats.lives, waves.current_wave, wave_info, waves.enemies_spawned, tower_hint
         ));
+    }
+}
+
+fn update_wave_announcement(
+    ann: Res<WaveAnnouncement>,
+    mut query: Query<&mut Text, With<WaveAnnouncementText>>,
+) {
+    for mut text in &mut query {
+        text.0 = ann.text.clone();
     }
 }

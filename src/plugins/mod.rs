@@ -13,9 +13,11 @@ pub mod input_plugin;
 pub mod map_plugin;
 pub mod projectile_plugin;
 pub mod tower_plugin;
+pub mod wave_plugin;
 
 pub use enemy_plugin::EnemyPlugin;
 pub use input_plugin::InputPlugin;
 pub use map_plugin::MapPlugin;
 pub use projectile_plugin::ProjectilePlugin;
 pub use tower_plugin::TowerPlugin;
+pub use wave_plugin::WavePlugin;
