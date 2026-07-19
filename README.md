@@ -1,6 +1,6 @@
 # Tower Siege: Grid Defense
 
-A **2D tower defense game** built with **Rust** and the **Bevy 0.15** game engine. This repository contains Days 1-2 of a planned 5-day build: a complete, runnable foundation with tower placement, projectile combat, and economy systems.
+A **2D tower defense game** built with **Rust** and the **Bevy 0.15** game engine. This repository contains Days 1-3 of a planned 5-day build: a complete, runnable foundation with tower placement, projectile combat, economy systems, and auto-scaling wave system.
 
 ---
 
@@ -65,14 +65,15 @@ cargo run
 | Input | Action |
 |-------|--------|
 | **Enter** / **Space** | Start game from main menu |
-| **Space** | Spawn a Normal enemy |
-| **1** | Spawn a Normal enemy |
+| **Enter** / **Space** | Start game from main menu / spawn a Normal enemy during play |
+| **1** | Spawn a Normal enemy (manual override) |
 | **2** | Spawn a Fast enemy |
 | **3** | Spawn a Tank enemy |
 | **4** | Select Arrow tower (50g, place with click) |
 | **5** | Select Cannon tower (100g, place with click) |
 | **Escape** | Clear tower selection / toggle pause |
 | **Left Click** | Place selected tower on Buildable tile, or debug-print grid cell |
+| | **Waves auto-start when Playing begins; press Space/1/2/3 for manual spawns** |
 
 ---
 
@@ -91,6 +92,7 @@ The project follows Bevy's **Entity Component System (ECS)** pattern, organized 
 | `plugins/input_plugin.rs` | Keyboard and mouse input handling for all game states |
 | `plugins/tower_plugin.rs` | Tower placement, targeting nearest enemy, projectile spawning |
 | `plugins/projectile_plugin.rs` | Projectile movement, collision, damage application, gold rewards |
+| `plugins/wave_plugin.rs` | Wave definitions, timed spawning, state transitions, announcements |
 
 ### Game States
 
@@ -127,6 +129,16 @@ MainMenu → Playing → Paused
 - **Lives system**: enemies reaching the base decrement lives (shown in HUD)
 - **Tower selection HUD**: displays active tower type in the status bar
 
+### Day 3 — Wave System ✓
+- **Auto-scaling wave generation**: each wave composed of Normal, Fast, and Tank enemies
+- **Timed spawn schedule**: enemies spawn automatically at calculated intervals
+- **Interleaved composition**: enemy types mixed within each wave for variety
+- **Wave state machine**: Idle → Spawning → Complete, with automatic transitions
+- **Inter-wave countdown**: 3-second delay between waves before auto-advancing
+- **Wave announcements**: "Wave N!" on start, "Wave N complete!" on finish (2-second banner)
+- **HUD progress**: displays spawned / total enemies for the current wave
+- **Manual spawns preserved**: Space/1/2/3 still work for testing alongside waves
+
 ---
 
 ## Project Layout
@@ -150,7 +162,8 @@ tower-siege-grid-defense/
         ├── enemy_plugin.rs         # Enemy spawning and path-following
         ├── input_plugin.rs         # Input handling
         ├── tower_plugin.rs         # Tower placement, targeting, shooting
-        └── projectile_plugin.rs    # Projectile movement and damage
+        ├── projectile_plugin.rs    # Projectile movement and damage
+        └── wave_plugin.rs          # Wave definitions, timed spawning, transitions
 ```
 
 ---
@@ -172,6 +185,13 @@ When you run `cargo run`, confirm the following:
 - [x] Towers automatically target and fire projectiles at nearby enemies
 - [x] Enemies die from projectile damage and award gold
 - [x] Left-clicking a non-buildable tile prints its grid cell and type
+- [x] On entering Playing, Wave 1 automatically starts (5 Normal enemies)
+- [x] Enemies spawn one at a time with a visible timer interval
+- [x] "Wave 1!" announcement banner appears briefly at wave start
+- [x] After all enemies are spawned, state transitions to Complete → Idle
+- [x] After 3 seconds in Idle, Wave 2 starts with more enemies (mixed types)
+- [x] "Wave 1 complete!" and "Wave 2!" banners appear at transitions
+- [x] HUD shows "Enemies: spawned/total" progress for the current wave
 
 ---
 
@@ -183,10 +203,8 @@ Foundation: grid, path, enemies, game states, HUD
 ### Day 2 ✓ (Complete)
 Towers, projectiles, economy, lives, tower types
 
-### Day 3 — Planned
-- Auto-scaling wave system with timed enemy spawns
-- Wave start/end UI and wave counter
-- Wave compositions (mixed enemy types per wave)
+### Day 3 ✓ (Complete)
+Auto-scaling wave system with timed spawns, wave UI, mixed compositions, wave state machine
 
 ### Day 4 — Planned
 - Tower upgrades (range, damage, fire rate)

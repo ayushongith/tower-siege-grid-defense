@@ -141,7 +141,7 @@ fn setup_menu_ui(mut commands: Commands) {
                 TextColor(Color::srgb(0.95, 0.92, 0.80)),
             ));
             parent.spawn((
-                Text::new("Day 2 — Towers & Combat"),
+                Text::new("Day 3 — Wave System"),
                 TextFont {
                     font_size: 24.0,
                     ..default()
@@ -271,7 +271,7 @@ fn update_hud(
         let wave_info = if waves.total_enemies > 0 {
             format!(
                 "Enemies: {}/{}",
-                waves.spawn_index.min(waves.total_enemies),
+                (waves.spawn_index as u32).min(waves.total_enemies),
                 waves.total_enemies
             )
         } else {

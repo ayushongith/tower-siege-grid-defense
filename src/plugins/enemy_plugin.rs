@@ -42,7 +42,7 @@ impl Plugin for EnemyPlugin {
 fn fulfill_spawn_requests(
     mut commands: Commands,
     mut request: ResMut<SpawnEnemyRequest>,
-    mut waves: ResMut<WaveManager>,
+    waves: ResMut<WaveManager>,
     map: Res<Map>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
