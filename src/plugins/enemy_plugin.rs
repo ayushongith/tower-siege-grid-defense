@@ -87,7 +87,6 @@ fn fulfill_spawn_requests(
     // Parent outline under body so it follows automatically.
     commands.entity(body).add_children(&[outline]);
 
-    waves.enemies_spawned += 1;
     info!(
         "Spawned {:?} enemy #{} at path start",
         enemy_type, waves.enemies_spawned
@@ -100,6 +99,7 @@ fn move_path_followers(
     map: Res<Map>,
     mut commands: Commands,
     mut stats: ResMut<GameStats>,
+    mut waves: ResMut<WaveManager>,
     mut query: Query<(Entity, &mut Transform, &mut Enemy), With<PathFollower>>,
 ) {
     let path = &map.path;
@@ -118,6 +118,7 @@ fn move_path_followers(
                 enemy.enemy_type, stats.lives
             );
             commands.entity(entity).despawn_recursive();
+            waves.enemies_alive = waves.enemies_alive.saturating_sub(1);
             continue;
         }
 
@@ -156,6 +157,7 @@ fn move_path_followers(
                 "Enemy {:?} reached base! Lives remaining: {}",
                 enemy.enemy_type, stats.lives
             );
+            waves.enemies_alive = waves.enemies_alive.saturating_sub(1);
             // Snap to final point for one clean frame if needed, then remove.
             if let Some(last) = path.last() {
                 transform.translation.x = last.x;

@@ -4,7 +4,7 @@ use bevy::window::PrimaryWindow;
 use crate::components::{EnemyType, TowerSelection, TowerType};
 use crate::plugins::enemy_plugin::SpawnEnemyRequest;
 use crate::plugins::tower_plugin::{find_tower_placement, spawn_tower};
-use crate::resources::{GameStats, Map};
+use crate::resources::{GameStats, Map, WaveManager};
 use crate::utils::world_to_grid;
 use crate::AppState;
 
@@ -68,22 +68,31 @@ fn handle_escape_and_tower_select(
 fn handle_spawn_keys(
     keys: Res<ButtonInput<KeyCode>>,
     mut spawn_request: ResMut<SpawnEnemyRequest>,
+    mut waves: ResMut<WaveManager>,
 ) {
     if keys.just_pressed(KeyCode::Space) {
         spawn_request.pending = true;
         spawn_request.enemy_type = EnemyType::Normal;
+        waves.enemies_spawned += 1;
+        waves.enemies_alive += 1;
     }
     if keys.just_pressed(KeyCode::Digit1) {
         spawn_request.pending = true;
         spawn_request.enemy_type = EnemyType::Normal;
+        waves.enemies_spawned += 1;
+        waves.enemies_alive += 1;
     }
     if keys.just_pressed(KeyCode::Digit2) {
         spawn_request.pending = true;
         spawn_request.enemy_type = EnemyType::Fast;
+        waves.enemies_spawned += 1;
+        waves.enemies_alive += 1;
     }
     if keys.just_pressed(KeyCode::Digit3) {
         spawn_request.pending = true;
         spawn_request.enemy_type = EnemyType::Tank;
+        waves.enemies_spawned += 1;
+        waves.enemies_alive += 1;
     }
 }
 

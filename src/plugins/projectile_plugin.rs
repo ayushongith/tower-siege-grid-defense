@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::components::{Enemy, Health, PathFollower, Position, Projectile};
-use crate::resources::GameStats;
+use crate::resources::{GameStats, WaveManager};
 use crate::AppState;
 
 pub struct ProjectilePlugin;
@@ -44,6 +44,7 @@ fn apply_projectile_damage(
     projectiles: Query<(Entity, &Projectile, &Transform)>,
     mut enemies: Query<(Entity, &mut Health, &Transform, &Enemy), With<PathFollower>>,
     mut stats: ResMut<GameStats>,
+    mut waves: ResMut<WaveManager>,
 ) {
     for (proj_entity, projectile, proj_transform) in &projectiles {
         let proj_pos = proj_transform.translation.truncate();
@@ -62,6 +63,7 @@ fn apply_projectile_damage(
 
             if health.current <= 0.0 {
                 stats.gold += enemy.gold_value;
+                waves.enemies_alive = waves.enemies_alive.saturating_sub(1);
                 info!(
                     "Enemy {:?} killed! +{} gold (total: {})",
                     enemy.enemy_type, enemy.gold_value, stats.gold

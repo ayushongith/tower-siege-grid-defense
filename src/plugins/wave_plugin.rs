@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 
-use crate::components::EnemyType;
 use crate::plugins::enemy_plugin::SpawnEnemyRequest;
 use crate::resources::{WaveManager, WaveState};
 use crate::AppState;
@@ -21,17 +20,11 @@ impl Default for WaveAnnouncement {
     }
 }
 
-/// Event sent when an enemy dies or reaches base, so WaveManager can track
-/// `enemies_alive` without depending on the specific kill system.
-#[derive(Event, Debug)]
-pub struct EnemyDeparted;
-
 pub struct WavePlugin;
 
 impl Plugin for WavePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WaveAnnouncement>()
-            .add_event::<EnemyDeparted>()
             .add_systems(OnEnter(AppState::Playing), start_or_advance_wave)
             .add_systems(
                 Update,
@@ -71,7 +64,6 @@ fn begin_wave(waves: &mut WaveManager, ann: &mut WaveAnnouncement) {
 
 /// Timer-driven spawning: pop one enemy from the queue each tick.
 fn wave_spawning_system(
-    mut commands: Commands,
     time: Res<Time>,
     mut waves: ResMut<WaveManager>,
     mut spawn_request: ResMut<SpawnEnemyRequest>,
@@ -92,7 +84,6 @@ fn wave_spawning_system(
         waves.spawn_index += 1;
         waves.enemies_spawned += 1;
         waves.enemies_alive += 1;
-        commands.trigger_targets(EnemyDeparted, ());
     }
 }
 
