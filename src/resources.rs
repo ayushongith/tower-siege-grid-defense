@@ -179,27 +179,110 @@ fn paint_orthogonal(
 }
 
 // ---------------------------------------------------------------------------
-// Waves (stub for Day 1 — Spacebar manual spawn is the main entry point)
+// Waves (Day 3 — full auto-scaling wave system)
 // ---------------------------------------------------------------------------
 
-/// Tracks wave progression. Fully driven by data files in later days;
-/// Day 1 only keeps the resource warm so systems can depend on it early.
+/// Wave lifecycle state machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum WaveState {
+    /// Between waves or at game start
+    #[default]
+    Idle,
+    /// Actively spawning enemies on a timer
+    Spawning,
+    /// All enemies spawned, waiting for remaining enemies to be killed / exit
+    Complete,
+}
+
+/// A single entry in a wave composition: how many of which enemy type.
+#[derive(Debug, Clone, Copy)]
+pub struct WaveEntry {
+    pub enemy_type: crate::components::EnemyType,
+    pub count: u32,
+}
+
+/// Tracks wave progression with full auto-spawn support.
 #[derive(Resource, Debug, Clone)]
 pub struct WaveManager {
     pub current_wave: u32,
+    pub state: WaveState,
+    /// Timer for spawning individual enemies within a wave
     pub spawn_timer: Timer,
-    pub wave_active: bool,
-    /// How many enemies have been manually / automatically spawned this session.
+    /// Current wave composition — flat list of enemy types to spawn in order
+    pub spawn_queue: Vec<crate::components::EnemyType>,
+    /// Index into `spawn_queue` for the next enemy
+    pub spawn_index: usize,
+    /// Total enemies in the current wave (for UI progress)
+    pub total_enemies: u32,
+    /// How many enemies have been spawned this session (all waves)
     pub enemies_spawned: u32,
+    /// Currently alive enemy count (decremented on kill or base-reach)
+    pub enemies_alive: u32,
+    /// Timer between waves (countdown in Idle before auto-starting next wave)
+    pub interwave_timer: Timer,
+    /// Whether to automatically advance to the next wave
+    pub auto_start_next: bool,
 }
 
 impl Default for WaveManager {
     fn default() -> Self {
         Self {
             current_wave: 0,
-            spawn_timer: Timer::from_seconds(1.0, TimerMode::Repeating),
-            wave_active: false,
+            state: WaveState::Idle,
+            spawn_timer: Timer::from_seconds(2.0, TimerMode::Repeating),
+            spawn_queue: Vec::new(),
+            spawn_index: 0,
+            total_enemies: 0,
             enemies_spawned: 0,
+            enemies_alive: 0,
+            interwave_timer: Timer::from_seconds(3.0, TimerMode::Once),
+            auto_start_next: true,
         }
+    }
+}
+
+impl WaveManager {
+    /// Generate the enemy composition for a given wave number (1-indexed).
+    /// Difficulty scales automatically.
+    pub fn generate_composition(wave: u32) -> Vec<crate::components::EnemyType> {
+        let normal_count = 4 + wave;
+        let fast_count = if wave >= 2 { wave - 1 } else { 0 };
+        let tank_count = if wave >= 3 { wave - 2 } else { 0 };
+
+        let mut queue = Vec::new();
+
+        // Interleave enemy types for variety: sprinkle fast/tank among normals.
+        // Pattern: N, F, N, T, N, F, N...
+        let total = normal_count + fast_count + tank_count;
+        let mut n_placed = 0u32;
+        let mut f_placed = 0u32;
+        let mut t_placed = 0u32;
+
+        for i in 0..total {
+            // Place a fast enemy every 3rd slot if still have fast enemies
+            if i % 3 == 1 && f_placed < fast_count {
+                queue.push(crate::components::EnemyType::Fast);
+                f_placed += 1;
+            } else if i % 5 == 0 && t_placed < tank_count {
+                queue.push(crate::components::EnemyType::Tank);
+                t_placed += 1;
+            } else if n_placed < normal_count {
+                queue.push(crate::components::EnemyType::Normal);
+                n_placed += 1;
+            } else if f_placed < fast_count {
+                queue.push(crate::components::EnemyType::Fast);
+                f_placed += 1;
+            } else if t_placed < tank_count {
+                queue.push(crate::components::EnemyType::Tank);
+                t_placed += 1;
+            }
+        }
+
+        queue
+    }
+
+    /// Compute spawn interval in seconds for a given wave (gets faster as waves progress).
+    pub fn spawn_interval(wave: u32) -> f32 {
+        (2.0 - (wave as f32 - 1.0) * 0.15).max(0.6)
     }
 }
