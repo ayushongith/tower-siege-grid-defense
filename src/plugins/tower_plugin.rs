@@ -2,7 +2,8 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use crate::components::{
-    Health, PathFollower, Position, Projectile, Tower, TowerRangePreview, TowerType,
+    GridPosition, Health, PathFollower, Position, Projectile, SelectionRing, Tower,
+    TowerEditTarget, TowerLevel, TowerRangePreview, TowerType,
 };
 use crate::resources::{GameStats, Map, TileType};
 use crate::utils::{grid_to_world, world_to_grid, TILE_SIZE};
@@ -12,16 +13,19 @@ pub struct TowerPlugin;
 
 impl Plugin for TowerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (
-                tower_targeting,
-                tower_shooting,
-                update_range_preview,
-            )
-                .chain()
-                .run_if(in_state(AppState::Playing)),
-        );
+        app.init_resource::<TowerEditTarget>()
+            .add_systems(
+                Update,
+                (
+                    tower_targeting,
+                    tower_shooting,
+                    update_range_preview,
+                    upgrade_tower_system,
+                    update_tower_selection_ring,
+                )
+                    .chain()
+                    .run_if(in_state(AppState::Playing)),
+            );
     }
 }
 
@@ -106,6 +110,86 @@ fn update_range_preview(
     }
 }
 
+/// Compute upgrade cost for a tower: base_cost * 0.75 * level.
+pub fn upgrade_cost(level: u32, base_cost: u32) -> u32 {
+    ((base_cost as f32) * 0.75 * level as f32).round() as u32
+}
+
+/// Handle 'U' key to upgrade the selected tower.
+fn upgrade_tower_system(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut stats: ResMut<GameStats>,
+    mut edit_target: ResMut<TowerEditTarget>,
+    mut towers: Query<(&mut Tower, &mut TowerLevel, &GridPosition)>,
+) {
+    if !keys.just_pressed(KeyCode::KeyU) {
+        return;
+    }
+    let Some(entity) = edit_target.entity else { return };
+
+    let Ok((mut tower, mut level, _grid)) = towers.get_mut(entity) else {
+        edit_target.entity = None;
+        return;
+    };
+
+    if level.level >= level.max_level {
+        info!("Tower already at max level {}", level.max_level);
+        return;
+    }
+
+    let cost = upgrade_cost(level.level, tower.tower_type.cost());
+    if stats.gold < cost {
+        info!("Not enough gold to upgrade: need {}, have {}", cost, stats.gold);
+        return;
+    }
+
+    stats.gold -= cost;
+    level.total_invested += cost;
+    level.level += 1;
+
+    // Apply stat improvements.
+    tower.damage += tower.tower_type.damage() * 0.25;
+    tower.range += tower.tower_type.range() * 0.10;
+    let new_rate = (tower.fire_rate * 0.90).max(0.3);
+    tower.fire_rate = new_rate;
+    tower.cooldown = Timer::from_seconds(new_rate, TimerMode::Repeating);
+
+    info!(
+        "Tower {:?} upgraded to level {}! damage={:.0}, range={:.0}, fire_rate={:.1}s",
+        tower.tower_type, level.level, tower.damage, tower.range, tower.fire_rate
+    );
+}
+
+/// Show/hide a selection ring sprite on the currently selected tower.
+fn update_tower_selection_ring(
+    mut commands: Commands,
+    edit_target: Res<TowerEditTarget>,
+    towers: Query<&Transform, With<Tower>>,
+    rings: Query<Entity, With<SelectionRing>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    // Despawn previous ring if it exists.
+    for ring_entity in &rings {
+        commands.entity(ring_entity).despawn();
+    }
+
+    // If a tower is selected, spawn a new ring at its position.
+    if let Some(entity) = edit_target.entity {
+        if let Ok(transform) = towers.get(entity) {
+            commands.spawn((
+                SelectionRing,
+                Mesh2d(meshes.add(Circle::new(30.0))),
+                MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgba(
+                    1.0, 1.0, 0.40, 0.35,
+                )))),
+                Transform::from_translation(Vec3::new(transform.translation.x, transform.translation.y, 7.0)),
+                Name::new("SelectionRing"),
+            ));
+        }
+    }
+}
+
 pub fn spawn_tower(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
@@ -136,6 +220,8 @@ pub fn spawn_tower(
     // Base platform
     commands.spawn((
         Tower::new(tower_type),
+        TowerLevel::new(tower_type.cost()),
+        GridPosition { col, row },
         Sprite {
             color: tower_type.color(),
             custom_size: Some(Vec2::splat(TILE_SIZE - 4.0)),

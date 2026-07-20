@@ -285,3 +285,7 @@ pub struct TowerEditTarget {
     pub col: usize,
     pub row: usize,
 }
+
+/// Marker for the selection ring sprite (child of a selected tower).
+#[derive(Component, Debug)]
+pub struct SelectionRing;

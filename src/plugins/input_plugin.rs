@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::components::{EnemyType, TowerSelection, TowerType};
+use crate::components::{EnemyType, GridPosition, TowerEditTarget, TowerSelection, TowerType};
 use crate::plugins::enemy_plugin::SpawnEnemyRequest;
 use crate::plugins::tower_plugin::{find_tower_placement, spawn_tower};
 use crate::resources::{GameStats, Map, WaveManager};
@@ -44,11 +44,15 @@ fn handle_escape_and_tower_select(
     keys: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<AppState>>,
     mut tower_sel: ResMut<TowerSelection>,
+    mut edit_target: ResMut<TowerEditTarget>,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
         if tower_sel.selected.is_some() {
             tower_sel.selected = None;
             info!("Tower selection cleared");
+        } else if edit_target.entity.is_some() {
+            edit_target.entity = None;
+            info!("Tower edit deselected");
         } else {
             info!("Playing → Paused");
             next_state.set(AppState::Paused);
@@ -57,10 +61,12 @@ fn handle_escape_and_tower_select(
 
     if keys.just_pressed(KeyCode::Digit4) {
         tower_sel.selected = Some(TowerType::Arrow);
+        edit_target.entity = None;
         info!("Selected Arrow tower (cost: {})", TowerType::Arrow.cost());
     }
     if keys.just_pressed(KeyCode::Digit5) {
         tower_sel.selected = Some(TowerType::Cannon);
+        edit_target.entity = None;
         info!("Selected Cannon tower (cost: {})", TowerType::Cannon.cost());
     }
 }
@@ -104,12 +110,17 @@ fn handle_mouse_playing(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut map: ResMut<Map>,
     mut stats: ResMut<GameStats>,
+    mut edit_target: ResMut<TowerEditTarget>,
+    towers: Query<(Entity, &GridPosition)>,
     windows: Query<&Window, With<PrimaryWindow>>,
     camera_q: Query<(&Camera, &GlobalTransform)>,
 ) {
     if !mouse.just_pressed(MouseButton::Left) {
         return;
     }
+
+    // Clear tower edit selection on any click.
+    edit_target.entity = None;
 
     if let Some(tower_type) = tower_sel.selected {
         if let Some((col, row)) = find_tower_placement(&windows, &camera_q, &*map) {
@@ -125,7 +136,22 @@ fn handle_mouse_playing(
             );
         }
     } else {
-        debug_print_grid_click(&windows, &camera_q, &*map);
+        // Click on Occupied tile → select existing tower for upgrade/sell.
+        if let Some((col, row)) = find_tower_placement(&windows, &camera_q, &*map) {
+            let tile = map.get_tile(col, row);
+            if tile == Some(crate::resources::TileType::Occupied) {
+                for (entity, grid) in &towers {
+                    if grid.col == col && grid.row == row {
+                        edit_target.entity = Some(entity);
+                        edit_target.col = col;
+                        edit_target.row = row;
+                        info!("Selected tower at ({col}, {row})");
+                        return;
+                    }
+                }
+            }
+            debug_print_grid_click(&windows, &camera_q, &*map);
+        }
     }
 }
 
