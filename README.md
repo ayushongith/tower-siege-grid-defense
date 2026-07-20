@@ -1,6 +1,6 @@
 # Tower Siege: Grid Defense
 
-A **2D tower defense game** built with **Rust** and the **Bevy 0.15** game engine. This repository contains Days 1-3 of a planned 5-day build: a complete, runnable foundation with tower placement, projectile combat, economy systems, and auto-scaling wave system.
+A **2D tower defense game** built with **Rust** and the **Bevy 0.15** game engine. This repository contains Days 1-4 of a planned 5-day build: a complete, runnable tower defense game with visual feedback, tower upgrades, and sell-back.
 
 ---
 
@@ -71,8 +71,10 @@ cargo run
 | **3** | Spawn a Tank enemy |
 | **4** | Select Arrow tower (50g, place with click) |
 | **5** | Select Cannon tower (100g, place with click) |
-| **Escape** | Clear tower selection / toggle pause |
-| **Left Click** | Place selected tower on Buildable tile, or debug-print grid cell |
+| **U** | Upgrade selected existing tower |
+| **S** | Sell selected existing tower (50% refund) |
+| **Escape** | Clear tower selection / tower edit / toggle pause |
+| **Left Click** | Place selected tower / select existing tower / debug-print grid cell |
 | | **Waves auto-start when Playing begins; press Space/1/2/3 for manual spawns** |
 
 ---
@@ -92,6 +94,7 @@ The project follows Bevy's **Entity Component System (ECS)** pattern, organized 
 | `plugins/input_plugin.rs` | Keyboard and mouse input handling for all game states |
 | `plugins/tower_plugin.rs` | Tower placement, targeting nearest enemy, projectile spawning |
 | `plugins/projectile_plugin.rs` | Projectile movement, collision, damage application, gold rewards |
+| `plugins/visual_plugin.rs` | Health bar updates, hit-effect particles, visual feedback |
 | `plugins/wave_plugin.rs` | Wave definitions, timed spawning, state transitions, announcements |
 
 ### Game States
@@ -139,6 +142,18 @@ MainMenu → Playing → Paused
 - **HUD progress**: displays spawned / total enemies for the current wave
 - **Manual spawns preserved**: Space/1/2/3 still work for testing alongside waves
 
+### Day 4 — Upgrades & Visuals ✓
+- **Health bars**: colored bar above each enemy (green → yellow → red based on HP%)
+- **Hit effects**: expanding circle particle on projectile impact with alpha fade
+- **VisualPlugin**: centralized system for health bar updates and hit effect lifecycle
+- **Tower upgrading**: select a tower by clicking, press **U** to upgrade (up to level 3)
+- **Upgrade stats**: +25% damage, +10% range, -10% fire rate per level
+- **Upgrade cost**: scales per level (base_cost × 0.75 × level)
+- **Tower sell-back**: press **S** on selected tower to refund 50% of total investment
+- **Selection ring**: translucent yellow circle highlights the selected tower
+- **HUD hints**: shows upgrade cost and sell refund when a tower is selected
+- **Turret parenting**: turret is child of tower base, despawns recursively on sell
+
 ---
 
 ## Project Layout
@@ -161,8 +176,9 @@ tower-siege-grid-defense/
         ├── map_plugin.rs           # Grid map generation and rendering
         ├── enemy_plugin.rs         # Enemy spawning and path-following
         ├── input_plugin.rs         # Input handling
-        ├── tower_plugin.rs         # Tower placement, targeting, shooting
-        ├── projectile_plugin.rs    # Projectile movement and damage
+        ├── tower_plugin.rs         # Tower placement, targeting, shooting, upgrades, sell-back
+        ├── projectile_plugin.rs    # Projectile movement, damage, hit effects
+        ├── visual_plugin.rs        # Health bars, hit-effect particles, visual feedback
         └── wave_plugin.rs          # Wave definitions, timed spawning, transitions
 ```
 
@@ -192,6 +208,12 @@ When you run `cargo run`, confirm the following:
 - [x] After 3 seconds in Idle, Wave 2 starts with more enemies (mixed types)
 - [x] "Wave 1 complete!" and "Wave 2!" banners appear at transitions
 - [x] HUD shows "Enemies: spawned/total" progress for the current wave
+- [x] Enemies have colored health bars above them (green → yellow → red)
+- [x] Projectile impacts show a brief expanding circle hit effect
+- [x] Click an occupied tile to select its tower (yellow ring appears)
+- [x] Press **U** to upgrade: damage, range, and fire rate improve; gold is deducted
+- [x] Press **S** to sell: tower and turret disappear, tile becomes Buildable, 50% refunded
+- [x] HUD shows upgrade cost and sell refund when a tower is selected
 
 ---
 
@@ -206,10 +228,8 @@ Towers, projectiles, economy, lives, tower types
 ### Day 3 ✓ (Complete)
 Auto-scaling wave system with timed spawns, wave UI, mixed compositions, wave state machine
 
-### Day 4 — Planned
-- Tower upgrades (range, damage, fire rate)
-- Tower sell-back
-- Visual feedback (health bars, hit effects)
+### Day 4 ✓ (Complete)
+Tower upgrades, sell-back, health bars, hit effects, selection ring, HUD integration
 
 ### Day 5 — Planned
 - Game over / victory states
