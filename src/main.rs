@@ -19,7 +19,7 @@ mod utils;
 
 use bevy::prelude::*;
 
-use components::TowerSelection;
+use components::{Tower, TowerEditTarget, TowerLevel, TowerSelection};
 use plugins::{
     wave_plugin::WaveAnnouncement, EnemyPlugin, InputPlugin, MapPlugin, ProjectilePlugin,
     TowerPlugin, VisualPlugin, WavePlugin,
@@ -141,7 +141,7 @@ fn setup_menu_ui(mut commands: Commands) {
                 TextColor(Color::srgb(0.95, 0.92, 0.80)),
             ));
             parent.spawn((
-                Text::new("Day 3 — Wave System"),
+                Text::new("Day 4 — Upgrades & Visuals"),
                 TextFont {
                     font_size: 24.0,
                     ..default()
@@ -157,9 +157,9 @@ fn setup_menu_ui(mut commands: Commands) {
                 TextColor(Color::srgb(0.85, 0.85, 0.85)),
             ));
             parent.spawn((
-                Text::new(
-                    "SPACE/1/2/3 spawn · 4=Arrow(50g) · 5=Cannon(100g) · LMB place tower · ESC pause",
-                ),
+Text::new(
+    "SPACE/1/2/3 spawn · 4=Arrow 5=Cannon · LMB place/select · U upgrade · S sell · ESC pause",
+),
                 TextFont {
                     font_size: 16.0,
                     ..default()
@@ -260,14 +260,28 @@ fn update_hud(
     stats: Res<GameStats>,
     waves: Res<WaveManager>,
     tower_sel: Res<TowerSelection>,
+    edit_target: Res<TowerEditTarget>,
+    towers: Query<(&Tower, &TowerLevel)>,
     mut hud: Query<(&mut Text, &mut Visibility), With<HudText>>,
 ) {
     for (mut text, mut vis) in &mut hud {
         *vis = Visibility::Visible;
-        let tower_hint = match tower_sel.selected {
-            Some(t) => format!(" [placing {:?} tower - click buildable tile]", t),
-            None => "".to_string(),
-        };
+        let mut hints = String::new();
+
+        if let Some(t) = tower_sel.selected {
+            hints.push_str(&format!(" [placing {:?} tower - click buildable tile]", t));
+        } else if let Some(entity) = edit_target.entity {
+            if let Ok((tower, level)) = towers.get(entity) {
+                hints.push_str(&format!(
+                    " [select {:?} Lv{} - U upgrade({}g) | S sell({}g)]",
+                    tower.tower_type,
+                    level.level,
+                    crate::plugins::tower_plugin::upgrade_cost(level.level, tower.tower_type.cost()),
+                    (level.total_invested as f32 * 0.5).round() as u32,
+                ));
+            }
+        }
+
         let wave_info = if waves.total_enemies > 0 {
             format!(
                 "Enemies: {}/{}",
@@ -279,7 +293,7 @@ fn update_hud(
         };
         *text = Text::new(format!(
             "Gold: {}   Lives: {}   Wave: {}   {}   Spawned: {}{}",
-            stats.gold, stats.lives, waves.current_wave, wave_info, waves.enemies_spawned, tower_hint
+            stats.gold, stats.lives, waves.current_wave, wave_info, waves.enemies_spawned, hints
         ));
     }
 }

@@ -21,6 +21,7 @@ impl Plugin for TowerPlugin {
                     tower_shooting,
                     update_range_preview,
                     upgrade_tower_system,
+                    sell_tower_system,
                     update_tower_selection_ring,
                 )
                     .chain()
@@ -160,6 +161,37 @@ fn upgrade_tower_system(
     );
 }
 
+/// Sell the selected tower: refund 50% of total invested, remove entity,
+/// mark tile as Buildable.
+fn sell_tower_system(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut commands: Commands,
+    mut stats: ResMut<GameStats>,
+    mut edit_target: ResMut<TowerEditTarget>,
+    mut map: ResMut<Map>,
+    towers: Query<(&Tower, &TowerLevel, &GridPosition)>,
+) {
+    if !keys.just_pressed(KeyCode::KeyS) {
+        return;
+    }
+    let Some(entity) = edit_target.entity else { return };
+    let Ok((tower, _level, grid)) = towers.get(entity) else {
+        edit_target.entity = None;
+        return;
+    };
+
+    let total = _level.total_invested;
+    let refund = (total as f32 * 0.50).round() as u32;
+    stats.gold += refund;
+    map.set_tile(grid.col, grid.row, TileType::Buildable);
+    commands.entity(entity).despawn_recursive();
+    info!(
+        "Sold {:?} tower at ({}, {}), refunded {}g",
+        tower.tower_type, grid.col, grid.row, refund
+    );
+    edit_target.entity = None;
+}
+
 /// Show/hide a selection ring sprite on the currently selected tower.
 fn update_tower_selection_ring(
     mut commands: Commands,
@@ -218,26 +250,31 @@ pub fn spawn_tower(
     let height = 24.0;
 
     // Base platform
-    commands.spawn((
-        Tower::new(tower_type),
-        TowerLevel::new(tower_type.cost()),
-        GridPosition { col, row },
-        Sprite {
-            color: tower_type.color(),
-            custom_size: Some(Vec2::splat(TILE_SIZE - 4.0)),
-            ..default()
-        },
-        Transform::from_translation(world.extend(5.0)),
-        Name::new(format!("Tower_{:?}_{}_{}", tower_type, col, row)),
-    ));
+    let base = commands
+        .spawn((
+            Tower::new(tower_type),
+            TowerLevel::new(tower_type.cost()),
+            GridPosition { col, row },
+            Sprite {
+                color: tower_type.color(),
+                custom_size: Some(Vec2::splat(TILE_SIZE - 4.0)),
+                ..default()
+            },
+            Transform::from_translation(world.extend(5.0)),
+            Name::new(format!("Tower_{:?}_{}_{}", tower_type, col, row)),
+        ))
+        .id();
 
-    // Turret circle on top
-    commands.spawn((
-        Mesh2d(meshes.add(Circle::new(height * 0.5))),
-        MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.15, 0.15, 0.15)))),
-        Transform::from_translation(world.extend(6.0)),
-        Name::new("TowerTurret"),
-    ));
+    // Turret circle on top (child of base — despawned with base on sell)
+    let turret = commands
+        .spawn((
+            Mesh2d(meshes.add(Circle::new(height * 0.5))),
+            MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.15, 0.15, 0.15)))),
+            Transform::from_translation(Vec3::ZERO),
+            Name::new("TowerTurret"),
+        ))
+        .id();
+    commands.entity(base).add_child(turret);
 
     info!(
         "Placed {:?} tower at ({col}, {row}), gold remaining: {}",
