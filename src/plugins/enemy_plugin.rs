@@ -8,7 +8,7 @@
 
 use bevy::prelude::*;
 
-use crate::components::{Enemy, EnemyType, Health, PathFollower, Position};
+use crate::components::{Enemy, EnemyType, Health, HealthBar, PathFollower, Position};
 use crate::resources::{GameStats, Map, WaveManager};
 use crate::AppState;
 
@@ -86,6 +86,22 @@ fn fulfill_spawn_requests(
 
     // Parent outline under body so it follows automatically.
     commands.entity(body).add_children(&[outline]);
+
+    // Health bar child positioned above the enemy.
+    let bar_y = radius + 10.0;
+    let health_bar = commands
+        .spawn((
+            HealthBar,
+            Sprite {
+                color: Color::srgb(0.20, 0.85, 0.20),
+                custom_size: Some(Vec2::new(36.0, 4.0)),
+                ..default()
+            },
+            Transform::from_translation(Vec3::new(0.0, bar_y, 0.5)),
+            Name::new("HealthBar"),
+        ))
+        .id();
+    commands.entity(body).add_children(&[health_bar]);
 
     info!(
         "Spawned {:?} enemy #{} at path start",

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::components::{Enemy, Health, PathFollower, Position, Projectile};
+use crate::components::{Enemy, Health, HitEffect, PathFollower, Position, Projectile};
 use crate::resources::{GameStats, WaveManager};
 use crate::AppState;
 
@@ -45,6 +45,8 @@ fn apply_projectile_damage(
     mut enemies: Query<(Entity, &mut Health, &Transform, &Enemy), With<PathFollower>>,
     mut stats: ResMut<GameStats>,
     mut waves: ResMut<WaveManager>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     for (proj_entity, projectile, proj_transform) in &projectiles {
         let proj_pos = proj_transform.translation.truncate();
@@ -60,6 +62,22 @@ fn apply_projectile_damage(
 
             health.current -= projectile.damage;
             commands.entity(proj_entity).despawn();
+
+            // Spawn hit effect at impact point.
+            let hit_color = if health.current <= 0.0 {
+                Color::srgb(1.0, 0.90, 0.30)
+            } else {
+                Color::srgb(1.0, 1.0, 1.0)
+            };
+            commands.spawn((
+                HitEffect {
+                    timer: Timer::from_seconds(0.2, TimerMode::Once),
+                },
+                Mesh2d(meshes.add(Circle::new(8.0))),
+                MeshMaterial2d(materials.add(ColorMaterial::from_color(hit_color))),
+                Transform::from_translation(enemy_pos.extend(20.0)),
+                Name::new("HitEffect"),
+            ));
 
             if health.current <= 0.0 {
                 stats.gold += enemy.gold_value;

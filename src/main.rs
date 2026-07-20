@@ -22,7 +22,7 @@ use bevy::prelude::*;
 use components::TowerSelection;
 use plugins::{
     wave_plugin::WaveAnnouncement, EnemyPlugin, InputPlugin, MapPlugin, ProjectilePlugin,
-    TowerPlugin, WavePlugin,
+    TowerPlugin, VisualPlugin, WavePlugin,
 };
 use resources::{GameStats, WaveManager};
 
@@ -69,7 +69,7 @@ fn main() {
         // --- States ----------------------------------------------------------
         .init_state::<AppState>()
         // --- Domain plugins --------------------------------------------------
-        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, WavePlugin))
+        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, VisualPlugin, WavePlugin))
         // --- Bootstrap systems ----------------------------------------------
         .add_systems(Startup, (setup_camera, setup_menu_ui))
         .add_systems(OnEnter(AppState::Playing), hide_menu_ui)

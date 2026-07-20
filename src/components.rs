@@ -248,3 +248,40 @@ pub struct Projectile {
 pub struct TowerSelection {
     pub selected: Option<TowerType>,
 }
+
+// ---------------------------------------------------------------------------
+// Day 4 — Upgrades, Visual Feedback
+// ---------------------------------------------------------------------------
+
+/// Marker for an enemy health bar child entity.
+#[derive(Component, Debug)]
+pub struct HealthBar;
+
+/// Tracks tower upgrade level and total gold invested (for sell-back).
+#[derive(Component, Debug, Clone)]
+pub struct TowerLevel {
+    pub level: u32,
+    pub max_level: u32,
+    pub total_invested: u32,
+}
+
+impl TowerLevel {
+    pub fn new(base_cost: u32) -> Self {
+        Self { level: 1, max_level: 3, total_invested: base_cost }
+    }
+}
+
+/// Temporary hit-effect particle that despawns after its timer expires.
+#[derive(Component, Debug)]
+pub struct HitEffect {
+    pub timer: Timer,
+}
+
+/// Resource: which existing tower entity the player has selected for
+/// upgrade / sell actions. Cleared when placing a new tower type.
+#[derive(Resource, Debug, Default)]
+pub struct TowerEditTarget {
+    pub entity: Option<Entity>,
+    pub col: usize,
+    pub row: usize,
+}
