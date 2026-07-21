@@ -19,7 +19,10 @@ mod utils;
 
 use bevy::prelude::*;
 
-use components::{Tower, TowerEditTarget, TowerLevel, TowerSelection};
+use components::{
+    HitEffect, PathFollower, Projectile, SelectionRing, Tower, TowerEditTarget, TowerLevel,
+    TowerSelection,
+};
 use plugins::{
     wave_plugin::WaveAnnouncement, EnemyPlugin, InputPlugin, MapPlugin, ProjectilePlugin,
     TowerPlugin, VisualPlugin, WavePlugin,
@@ -38,6 +41,8 @@ pub enum AppState {
     MainMenu,
     Playing,
     Paused,
+    GameOver,
+    Victory,
 }
 
 // ---------------------------------------------------------------------------
@@ -71,16 +76,22 @@ fn main() {
         // --- Domain plugins --------------------------------------------------
         .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, VisualPlugin, WavePlugin))
         // --- Bootstrap systems ----------------------------------------------
-        .add_systems(Startup, (setup_camera, setup_menu_ui))
+        .add_systems(Startup, (setup_camera, setup_menu_ui, setup_game_over_ui, setup_victory_ui))
         .add_systems(OnEnter(AppState::Playing), hide_menu_ui)
         .add_systems(OnEnter(AppState::MainMenu), show_menu_ui)
         .add_systems(OnEnter(AppState::Paused), show_paused_banner)
         .add_systems(OnExit(AppState::Paused), hide_paused_banner)
+        .add_systems(OnEnter(AppState::GameOver), (show_game_over_ui, cleanup_gameplay))
+        .add_systems(OnExit(AppState::GameOver), hide_game_over_ui)
+        .add_systems(OnEnter(AppState::Victory), (show_victory_ui, cleanup_gameplay))
+        .add_systems(OnExit(AppState::Victory), hide_victory_ui)
         .add_systems(
             Update,
             (
                 update_hud,
                 update_wave_announcement,
+                detect_game_over,
+                detect_victory,
             )
                 .run_if(in_state(AppState::Playing).or(in_state(AppState::Paused))),
         )
@@ -113,6 +124,12 @@ struct HudText;
 
 #[derive(Component)]
 struct WaveAnnouncementText;
+
+#[derive(Component)]
+struct GameOverUi;
+
+#[derive(Component)]
+struct VictoryUi;
 
 fn setup_menu_ui(mut commands: Commands) {
     // Root UI node covering the window.
@@ -304,5 +321,139 @@ fn update_wave_announcement(
 ) {
     for mut text in &mut query {
         text.0 = ann.text.clone();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Game Over / Victory UI
+// ---------------------------------------------------------------------------
+
+fn setup_game_over_ui(mut commands: Commands) {
+    commands
+        .spawn((
+            GameOverUi,
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(16.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.15, 0.05, 0.05, 0.88)),
+            Visibility::Hidden,
+            Name::new("GameOverRoot"),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("GAME OVER"),
+                TextFont { font_size: 64.0, ..default() },
+                TextColor(Color::srgb(0.95, 0.20, 0.20)),
+            ));
+            parent.spawn((
+                Text::new("Press ENTER or SPACE to return to menu"),
+                TextFont { font_size: 22.0, ..default() },
+                TextColor(Color::srgb(0.85, 0.85, 0.85)),
+            ));
+        });
+}
+
+fn show_game_over_ui(mut query: Query<&mut Visibility, With<GameOverUi>>) {
+    for mut vis in &mut query {
+        *vis = Visibility::Visible;
+    }
+}
+
+fn hide_game_over_ui(mut query: Query<&mut Visibility, With<GameOverUi>>) {
+    for mut vis in &mut query {
+        *vis = Visibility::Hidden;
+    }
+}
+
+fn setup_victory_ui(mut commands: Commands) {
+    commands
+        .spawn((
+            VictoryUi,
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(16.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.05, 0.15, 0.05, 0.88)),
+            Visibility::Hidden,
+            Name::new("VictoryRoot"),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("VICTORY!"),
+                TextFont { font_size: 64.0, ..default() },
+                TextColor(Color::srgb(0.30, 0.90, 0.30)),
+            ));
+            parent.spawn((
+                Text::new("All waves survived! You defended the base."),
+                TextFont { font_size: 22.0, ..default() },
+                TextColor(Color::srgb(0.85, 0.85, 0.85)),
+            ));
+            parent.spawn((
+                Text::new("Press ENTER or SPACE to return to menu"),
+                TextFont { font_size: 22.0, ..default() },
+                TextColor(Color::srgb(0.85, 0.85, 0.85)),
+            ));
+        });
+}
+
+fn show_victory_ui(mut query: Query<&mut Visibility, With<VictoryUi>>) {
+    for mut vis in &mut query {
+        *vis = Visibility::Visible;
+    }
+}
+
+fn hide_victory_ui(mut query: Query<&mut Visibility, With<VictoryUi>>) {
+    for mut vis in &mut query {
+        *vis = Visibility::Hidden;
+    }
+}
+
+/// Despawn all gameplay entities when game ends.
+fn cleanup_gameplay(
+    mut commands: Commands,
+    enemies: Query<Entity, With<PathFollower>>,
+    towers: Query<Entity, (With<Tower>, Without<PathFollower>)>,
+    projectiles: Query<Entity, With<Projectile>>,
+    hit_effects: Query<Entity, With<HitEffect>>,
+    selection_rings: Query<Entity, With<SelectionRing>>,
+) {
+    for e in &enemies { commands.entity(e).despawn_recursive(); }
+    for e in &towers { commands.entity(e).despawn_recursive(); }
+    for e in &projectiles { commands.entity(e).despawn(); }
+    for e in &hit_effects { commands.entity(e).despawn(); }
+    for e in &selection_rings { commands.entity(e).despawn(); }
+}
+
+/// Transition to GameOver when lives reach 0.
+fn detect_game_over(
+    stats: Res<GameStats>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    if stats.lives == 0 {
+        info!("Game Over — lives depleted");
+        next_state.set(AppState::GameOver);
+    }
+}
+
+/// Transition to Victory after clearing enough waves.
+fn detect_victory(
+    waves: Res<WaveManager>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    // Victory after clearing wave 10 (after it enters Idle from Complete)
+    if waves.current_wave >= 10 && waves.state == crate::resources::WaveState::Idle && waves.enemies_alive == 0 {
+        info!("Victory — all 10 waves cleared!");
+        next_state.set(AppState::Victory);
     }
 }

@@ -25,6 +25,8 @@ impl Plugin for InputPlugin {
                         .chain()
                         .run_if(in_state(AppState::Playing)),
                     handle_paused_input.run_if(in_state(AppState::Paused)),
+                    handle_game_over_input.run_if(in_state(AppState::GameOver)),
+                    handle_victory_input.run_if(in_state(AppState::Victory)),
                 ),
             );
     }
@@ -162,6 +164,54 @@ fn handle_paused_input(
     if keys.just_pressed(KeyCode::Escape) {
         info!("Paused → Playing");
         next_state.set(AppState::Playing);
+    }
+}
+
+/// Reset resources for a fresh game — called when transitioning from
+/// GameOver/Victory back to MainMenu.
+pub fn reset_game_state(
+    mut stats: ResMut<GameStats>,
+    mut waves: ResMut<WaveManager>,
+    mut map: ResMut<Map>,
+    mut tower_sel: ResMut<TowerSelection>,
+    mut edit_target: ResMut<TowerEditTarget>,
+) {
+    *stats = GameStats::default();
+    *waves = WaveManager::default();
+    *map = Map::generate_day1();
+    tower_sel.selected = None;
+    edit_target.entity = None;
+}
+
+fn handle_game_over_input(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<AppState>>,
+    stats: ResMut<GameStats>,
+    waves: ResMut<WaveManager>,
+    map: ResMut<Map>,
+    tower_sel: ResMut<TowerSelection>,
+    edit_target: ResMut<TowerEditTarget>,
+) {
+    if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {
+        reset_game_state(stats, waves, map, tower_sel, edit_target);
+        info!("GameOver → MainMenu");
+        next_state.set(AppState::MainMenu);
+    }
+}
+
+fn handle_victory_input(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<AppState>>,
+    stats: ResMut<GameStats>,
+    waves: ResMut<WaveManager>,
+    map: ResMut<Map>,
+    tower_sel: ResMut<TowerSelection>,
+    edit_target: ResMut<TowerEditTarget>,
+) {
+    if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {
+        reset_game_state(stats, waves, map, tower_sel, edit_target);
+        info!("Victory → MainMenu");
+        next_state.set(AppState::MainMenu);
     }
 }
 
