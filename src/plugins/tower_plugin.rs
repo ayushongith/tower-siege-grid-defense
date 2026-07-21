@@ -7,6 +7,7 @@ use crate::components::{
 };
 use crate::resources::{GameStats, Map, TileType};
 use crate::utils::{grid_to_world, world_to_grid, TILE_SIZE};
+use crate::sfx::SfxRequest;
 use crate::AppState;
 
 pub struct TowerPlugin;
@@ -60,6 +61,7 @@ fn tower_shooting(
     mut towers: Query<(Entity, &mut Tower, &Transform)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut sfx: EventWriter<SfxRequest>,
 ) {
     for (_entity, mut tower, transform) in &mut towers {
         tower.cooldown.tick(time.delta());
@@ -97,6 +99,7 @@ fn tower_shooting(
             Position(proj_start),
             Name::new(format!("Projectile_{:?}", tower.tower_type)),
         ));
+        sfx.send(SfxRequest::Shoot);
     }
 }
 

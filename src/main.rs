@@ -15,6 +15,7 @@
 mod components;
 mod plugins;
 mod resources;
+mod sfx;
 mod utils;
 
 use bevy::prelude::*;
@@ -76,14 +77,15 @@ fn main() {
         // --- Domain plugins --------------------------------------------------
         .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, VisualPlugin, WavePlugin))
         // --- Bootstrap systems ----------------------------------------------
-        .add_systems(Startup, (setup_camera, setup_menu_ui, setup_game_over_ui, setup_victory_ui))
+        .add_event::<sfx::SfxRequest>()
+        .add_systems(Startup, (setup_camera, setup_menu_ui, setup_game_over_ui, setup_victory_ui, sfx::setup_sfx))
         .add_systems(OnEnter(AppState::Playing), hide_menu_ui)
         .add_systems(OnEnter(AppState::MainMenu), show_menu_ui)
         .add_systems(OnEnter(AppState::Paused), show_paused_banner)
         .add_systems(OnExit(AppState::Paused), hide_paused_banner)
-        .add_systems(OnEnter(AppState::GameOver), (show_game_over_ui, cleanup_gameplay))
-        .add_systems(OnExit(AppState::GameOver), hide_game_over_ui)
-        .add_systems(OnEnter(AppState::Victory), (show_victory_ui, cleanup_gameplay))
+.add_systems(OnEnter(AppState::GameOver), (show_game_over_ui, cleanup_gameplay, sfx::play_game_over_sfx))
+.add_systems(OnExit(AppState::GameOver), hide_game_over_ui)
+.add_systems(OnEnter(AppState::Victory), (show_victory_ui, cleanup_gameplay, sfx::play_victory_sfx))
         .add_systems(OnExit(AppState::Victory), hide_victory_ui)
         .add_systems(
             Update,
@@ -92,6 +94,7 @@ fn main() {
                 update_wave_announcement,
                 detect_game_over,
                 detect_victory,
+                sfx::handle_sfx_requests,
             )
                 .run_if(in_state(AppState::Playing).or(in_state(AppState::Paused))),
         )

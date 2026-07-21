@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::plugins::enemy_plugin::SpawnEnemyRequest;
 use crate::resources::{WaveManager, WaveState};
+use crate::sfx::SfxRequest;
 use crate::AppState;
 
 /// Single-frame banner shown to the player (wave start / complete).
@@ -40,9 +41,14 @@ impl Plugin for WavePlugin {
 }
 
 /// When entering Playing, start wave 1 if no wave has been started yet.
-fn start_or_advance_wave(mut waves: ResMut<WaveManager>, mut ann: ResMut<WaveAnnouncement>) {
+fn start_or_advance_wave(
+    mut waves: ResMut<WaveManager>,
+    mut ann: ResMut<WaveAnnouncement>,
+    mut sfx: EventWriter<SfxRequest>,
+) {
     if waves.state == WaveState::Idle && waves.current_wave == 0 {
         begin_wave(&mut waves, &mut ann);
+        sfx.send(SfxRequest::WaveStart);
     }
 }
 
@@ -95,6 +101,7 @@ fn wave_transition_system(
     time: Res<Time>,
     mut waves: ResMut<WaveManager>,
     mut ann: ResMut<WaveAnnouncement>,
+    mut sfx: EventWriter<SfxRequest>,
 ) {
     match waves.state {
         WaveState::Spawning => {
@@ -115,6 +122,7 @@ fn wave_transition_system(
         WaveState::Idle => {
             if waves.auto_start_next && waves.interwave_timer.tick(time.delta()).finished() {
                 begin_wave(&mut waves, &mut ann);
+                sfx.send(SfxRequest::WaveStart);
             }
         }
     }

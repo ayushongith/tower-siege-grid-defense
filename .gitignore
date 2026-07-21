@@ -1,5 +1,6 @@
 # Rust build artifacts
-/target/
+/target
+/assets/sounds/*.wav/
 **/*.rs.bk
 Cargo.toml.orig
 

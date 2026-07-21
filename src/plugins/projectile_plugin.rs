@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::components::{Enemy, Health, HitEffect, PathFollower, Position, Projectile};
+use crate::sfx::SfxRequest;
 use crate::resources::{GameStats, WaveManager};
 use crate::AppState;
 
@@ -47,6 +48,7 @@ fn apply_projectile_damage(
     mut waves: ResMut<WaveManager>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut sfx: EventWriter<SfxRequest>,
 ) {
     for (proj_entity, projectile, proj_transform) in &projectiles {
         let proj_pos = proj_transform.translation.truncate();
@@ -62,6 +64,8 @@ fn apply_projectile_damage(
 
             health.current -= projectile.damage;
             commands.entity(proj_entity).despawn();
+
+            sfx.send(SfxRequest::Hit);
 
             // Spawn hit effect at impact point.
             let hit_color = if health.current <= 0.0 {
@@ -82,6 +86,7 @@ fn apply_projectile_damage(
             if health.current <= 0.0 {
                 stats.gold += enemy.gold_value;
                 waves.enemies_alive = waves.enemies_alive.saturating_sub(1);
+                sfx.send(SfxRequest::Kill);
                 info!(
                     "Enemy {:?} killed! +{} gold (total: {})",
                     enemy.enemy_type, enemy.gold_value, stats.gold
