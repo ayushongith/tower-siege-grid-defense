@@ -161,7 +161,7 @@ fn setup_menu_ui(mut commands: Commands) {
                 TextColor(Color::srgb(0.95, 0.92, 0.80)),
             ));
             parent.spawn((
-                Text::new("Day 4 — Upgrades & Visuals"),
+                Text::new("Day 5 — Release"),
                 TextFont {
                     font_size: 24.0,
                     ..default()

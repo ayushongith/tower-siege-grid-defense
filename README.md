@@ -1,6 +1,6 @@
 # Tower Siege: Grid Defense
 
-A **2D tower defense game** built with **Rust** and the **Bevy 0.15** game engine. This repository contains Days 1-4 of a planned 5-day build: a complete, runnable tower defense game with visual feedback, tower upgrades, and sell-back.
+A **2D tower defense game** built with **Rust** and the **Bevy 0.15** game engine. This repository is a complete 5-day build: a fully playable tower defense game with waves, towers, upgrades, audio, and game-over/victory states.
 
 ---
 
@@ -65,7 +65,7 @@ cargo run
 | Input | Action |
 |-------|--------|
 | **Enter** / **Space** | Start game from main menu |
-| **Enter** / **Space** | Start game from main menu / spawn a Normal enemy during play |
+| **Enter** / **Space** | Start game / restart after game over or victory / spawn Normal during play |
 | **1** | Spawn a Normal enemy (manual override) |
 | **2** | Spawn a Fast enemy |
 | **3** | Spawn a Tank enemy |
@@ -154,6 +154,16 @@ MainMenu → Playing → Paused
 - **HUD hints**: shows upgrade cost and sell refund when a tower is selected
 - **Turret parenting**: turret is child of tower base, despawns recursively on sell
 
+### Day 5 — Release ✓
+- **Game Over state**: triggers when lives reach 0, with full-screen overlay
+- **Victory state**: triggers after clearing 10 waves, with congratulations screen
+- **Restart flow**: Enter/Space from Game Over or Victory returns to MainMenu with all state reset
+- **Cleanup system**: despawning all gameplay entities (enemies, towers, projectiles) on game end
+- **Procedural audio**: six sound effects generated as WAV files at runtime (no external assets)
+- **Event-driven SFX**: SfxRequest events trigger sounds for shooting, hits, kills, and wave starts
+- **Enemy scaling**: HP scales +10% per wave, gold rewards scale +2 per wave
+- **Balancing tuned**: starting gold 250, smoother wave composition curve, faster spawn intervals
+
 ---
 
 ## Project Layout
@@ -170,6 +180,7 @@ tower-siege-grid-defense/
     ├── main.rs             # App entry point, plugins, UI, state management
     ├── components.rs       # ECS component definitions
     ├── resources.rs        # Global resources and game state
+    ├── sfx.rs              # Procedural audio generation and playback
     ├── utils.rs            # Coordinate conversion helpers
     └── plugins/
         ├── mod.rs          # Plugin module exports
@@ -214,6 +225,13 @@ When you run `cargo run`, confirm the following:
 - [x] Press **U** to upgrade: damage, range, and fire rate improve; gold is deducted
 - [x] Press **S** to sell: tower and turret disappear, tile becomes Buildable, 50% refunded
 - [x] HUD shows upgrade cost and sell refund when a tower is selected
+- [x] When lives reach 0, Game Over screen appears with restart prompt
+- [x] After clearing 10 waves, Victory screen appears with congratulations
+- [x] Press Enter/Space on Game Over or Victory to return to MainMenu
+- [x] Restarting resets all state: gold, lives, waves, map tiles, and despawns all entities
+- [x] Shooting, hit, kill, and wave start sounds play during gameplay
+- [x] Game Over and Victory have distinct sound effects
+- [x] Enemy HP increases ~10% per wave (tougher late-game enemies)
 
 ---
 
@@ -231,10 +249,8 @@ Auto-scaling wave system with timed spawns, wave UI, mixed compositions, wave st
 ### Day 4 ✓ (Complete)
 Tower upgrades, sell-back, health bars, hit effects, selection ring, HUD integration
 
-### Day 5 — Planned
-- Game over / victory states
-- Audio (SFX + background)
-- Polish, balancing, and release
+### Day 5 ✓ (Complete)
+Game over / victory states, procedural audio, balancing, restart flow, release
 
 ---
 
