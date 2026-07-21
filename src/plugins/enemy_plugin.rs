@@ -42,7 +42,7 @@ impl Plugin for EnemyPlugin {
 fn fulfill_spawn_requests(
     mut commands: Commands,
     mut request: ResMut<SpawnEnemyRequest>,
-    waves: ResMut<WaveManager>,
+    waves: Res<WaveManager>,
     map: Res<Map>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -60,6 +60,7 @@ fn fulfill_spawn_requests(
     let enemy_type = request.enemy_type;
     let radius = enemy_type.radius();
     let color = enemy_type.color();
+    let wave_scale = 1.0 + (waves.current_wave.saturating_sub(1) as f32) * 0.10;
 
     // Black outline: slightly larger disc behind the body (z-order).
     let outline = commands
@@ -71,14 +72,21 @@ fn fulfill_spawn_requests(
         ))
         .id();
 
+    let bonus_gold = (waves.current_wave.saturating_sub(1)) * 2;
     let body = commands
         .spawn((
             Mesh2d(meshes.add(Circle::new(radius))),
             MeshMaterial2d(materials.add(ColorMaterial::from_color(color))),
             Transform::from_translation(start.extend(10.0)),
             Position(start),
-            Health::full(enemy_type.base_health()),
-            Enemy::new(enemy_type),
+            Health::full(enemy_type.base_health() * wave_scale),
+            Enemy {
+                enemy_type,
+                speed: enemy_type.base_speed(),
+                waypoint_index: 0,
+                progress: 0.0,
+                gold_value: enemy_type.gold_value() + bonus_gold,
+            },
             PathFollower,
             Name::new(format!("Enemy_{enemy_type:?}")),
         ))

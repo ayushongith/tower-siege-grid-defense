@@ -27,7 +27,7 @@ pub struct GameStats {
 impl Default for GameStats {
     fn default() -> Self {
         Self {
-            gold: 200,
+            gold: 250,
             lives: 20,
             current_wave: 0,
         }
@@ -245,21 +245,18 @@ impl WaveManager {
     /// Generate the enemy composition for a given wave number (1-indexed).
     /// Difficulty scales automatically.
     pub fn generate_composition(wave: u32) -> Vec<crate::components::EnemyType> {
-        let normal_count = 4 + wave;
-        let fast_count = if wave >= 2 { wave - 1 } else { 0 };
-        let tank_count = if wave >= 3 { wave - 2 } else { 0 };
+        let normal_count = 3 + wave;        // 4, 5, 6, 7, 8, 9, 10...
+        let fast_count = if wave >= 2 { wave.saturating_sub(1) } else { 0 };  // 0,1,2,3...
+        let tank_count = if wave >= 3 { wave.saturating_sub(2) } else { 0 };  // 0,0,1,2...
 
         let mut queue = Vec::new();
 
-        // Interleave enemy types for variety: sprinkle fast/tank among normals.
-        // Pattern: N, F, N, T, N, F, N...
         let total = normal_count + fast_count + tank_count;
         let mut n_placed = 0u32;
         let mut f_placed = 0u32;
         let mut t_placed = 0u32;
 
         for i in 0..total {
-            // Place a fast enemy every 3rd slot if still have fast enemies
             if i % 3 == 1 && f_placed < fast_count {
                 queue.push(crate::components::EnemyType::Fast);
                 f_placed += 1;
@@ -281,8 +278,9 @@ impl WaveManager {
         queue
     }
 
-    /// Compute spawn interval in seconds for a given wave (gets faster as waves progress).
+    /// Compute spawn interval in seconds for a given wave.
+    /// Gets faster as waves progress, with a floor.
     pub fn spawn_interval(wave: u32) -> f32 {
-        (2.0 - (wave as f32 - 1.0) * 0.15).max(0.6)
+        (1.8 - (wave as f32 - 1.0) * 0.12).max(0.5)
     }
 }
