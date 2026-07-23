@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::plugins::enemy_plugin::SpawnEnemyRequest;
-use crate::resources::{WaveManager, WaveState};
+use crate::resources::{GameSettings, WaveManager, WaveModifier, WaveState};
 use crate::sfx::SfxRequest;
 use crate::AppState;
 
@@ -45,21 +45,23 @@ fn start_or_advance_wave(
     mut waves: ResMut<WaveManager>,
     mut ann: ResMut<WaveAnnouncement>,
     mut sfx: EventWriter<SfxRequest>,
+    settings: Res<GameSettings>,
 ) {
     if waves.state == WaveState::Idle && waves.current_wave == 0 {
-        begin_wave(&mut waves, &mut ann);
+        begin_wave(&mut waves, &mut ann, &settings);
         sfx.send(SfxRequest::WaveStart);
     }
 }
 
-fn begin_wave(waves: &mut WaveManager, ann: &mut WaveAnnouncement) {
+fn begin_wave(waves: &mut WaveManager, ann: &mut WaveAnnouncement, settings: &GameSettings) {
     waves.current_wave += 1;
+    waves.modifier = WaveModifier::for_wave(waves.current_wave);
     waves.state = WaveState::Spawning;
-    waves.spawn_queue = WaveManager::generate_composition(waves.current_wave);
+    waves.spawn_queue = WaveManager::generate_composition(waves.current_wave, waves.modifier);
     waves.spawn_index = 0;
     waves.total_enemies = waves.spawn_queue.len() as u32;
     waves.spawn_timer =
-        Timer::from_seconds(WaveManager::spawn_interval(waves.current_wave), TimerMode::Repeating);
+        Timer::from_seconds(WaveManager::spawn_interval(waves.current_wave, settings.difficulty), TimerMode::Repeating);
     ann.text = format!("Wave {}!", waves.current_wave);
     ann.timer.reset();
     info!(
@@ -102,6 +104,7 @@ fn wave_transition_system(
     mut waves: ResMut<WaveManager>,
     mut ann: ResMut<WaveAnnouncement>,
     mut sfx: EventWriter<SfxRequest>,
+    settings: Res<GameSettings>,
 ) {
     match waves.state {
         WaveState::Spawning => {
@@ -121,7 +124,7 @@ fn wave_transition_system(
         }
         WaveState::Idle => {
             if waves.auto_start_next && waves.interwave_timer.tick(time.delta()).finished() {
-                begin_wave(&mut waves, &mut ann);
+                begin_wave(&mut waves, &mut ann, &settings);
                 sfx.send(SfxRequest::WaveStart);
             }
         }

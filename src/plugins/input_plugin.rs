@@ -61,15 +61,12 @@ fn handle_escape_and_tower_select(
         }
     }
 
-    if keys.just_pressed(KeyCode::Digit4) {
-        tower_sel.selected = Some(TowerType::Arrow);
-        edit_target.entity = None;
-        info!("Selected Arrow tower (cost: {})", TowerType::Arrow.cost());
-    }
-    if keys.just_pressed(KeyCode::Digit5) {
-        tower_sel.selected = Some(TowerType::Cannon);
-        edit_target.entity = None;
-        info!("Selected Cannon tower (cost: {})", TowerType::Cannon.cost());
+    for tower_type in TowerType::ALL {
+        if keys.just_pressed(tower_type.hotkey()) {
+            tower_sel.selected = Some(tower_type);
+            edit_target.entity = None;
+            info!("Selected {} tower (cost: {})", tower_type.label(), tower_type.cost());
+        }
     }
 }
 

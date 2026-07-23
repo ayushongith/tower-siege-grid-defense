@@ -1,23 +1,16 @@
-//! EnemyPlugin — spawn test creeps and advance them along `Map.path`.
-//!
-//! Movement is pure ECS: a system reads `Map` + `Time`, writes `Transform` /
-//! `Position` / `Enemy` progress. No OOP "enemy.update()" methods.
-//!
-//! Day 1: manual Spacebar spawn only. WaveManager is updated for bookkeeping
-//! so Day 2 can swap the input trigger for a wave schedule without redesign.
-
+use bevy::math::primitives::RegularPolygon;
 use bevy::prelude::*;
 
-use crate::components::{Enemy, EnemyType, Health, HealthBar, PathFollower, Position};
-use crate::resources::{GameStats, Map, WaveManager};
+use crate::components::{Armor, Enemy, EnemyType, Health, HealthBar, PathFollower, Position, StunDebuff};
+use crate::plugins::status_plugin::is_stunned;
+use crate::resources::{GameSettings, GameStats, Map, WaveManager, WaveModifier};
 use crate::AppState;
 
-/// Event-like resource flag set by InputPlugin when the player presses Space.
-/// Using a tiny resource avoids coupling InputPlugin to mesh assets.
 #[derive(Resource, Debug, Default)]
 pub struct SpawnEnemyRequest {
     pub pending: bool,
     pub enemy_type: EnemyType,
+    pub from_wave: bool,
 }
 
 pub struct EnemyPlugin;
@@ -38,7 +31,6 @@ impl Plugin for EnemyPlugin {
     }
 }
 
-/// Consume spawn requests and create enemy entities at path start.
 fn fulfill_spawn_requests(
     mut commands: Commands,
     mut request: ResMut<SpawnEnemyRequest>,
@@ -53,7 +45,6 @@ fn fulfill_spawn_requests(
     request.pending = false;
 
     let Some(start) = map.path.first().copied() else {
-        warn!("Cannot spawn enemy: map path is empty");
         return;
     };
 
@@ -62,40 +53,65 @@ fn fulfill_spawn_requests(
     let color = enemy_type.color();
     let wave_scale = 1.0 + (waves.current_wave.saturating_sub(1) as f32) * 0.10;
 
-    // Black outline: slightly larger disc behind the body (z-order).
+    let speed_mult = if waves.modifier == WaveModifier::Fast { 1.35 } else { 1.0 };
+
+    let body_mesh: Mesh = if enemy_type.sides() > 0 {
+        Mesh::from(RegularPolygon {
+            circumcircle: Circle::new(radius),
+            sides: enemy_type.sides(),
+        })
+    } else {
+        Mesh::from(Circle::new(radius))
+    };
+    let outline_mesh: Mesh = if enemy_type.sides() > 0 {
+        Mesh::from(RegularPolygon {
+            circumcircle: Circle::new(radius + 3.0),
+            sides: enemy_type.sides(),
+        })
+    } else {
+        Mesh::from(Circle::new(radius + 3.0))
+    };
+
     let outline = commands
         .spawn((
-            Mesh2d(meshes.add(Circle::new(radius + 3.0))),
+            Mesh2d(meshes.add(outline_mesh)),
             MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.05, 0.05, 0.05)))),
             Transform::from_translation(Vec3::new(0.0, 0.0, -0.1)),
-            Name::new("EnemyOutline"),
         ))
         .id();
 
-    let bonus_gold = (waves.current_wave.saturating_sub(1)) * 2;
+    let mut bonus_gold = (waves.current_wave.saturating_sub(1)) * 2;
+    if waves.modifier == WaveModifier::BonusGold {
+        bonus_gold += 5;
+    }
+
+    let mut enemy = Enemy::new(enemy_type);
+    enemy.speed = enemy.base_speed * speed_mult;
+    enemy.gold_value += bonus_gold;
+
+    let rotation = match enemy_type {
+        EnemyType::Fast | EnemyType::Swarm => Quat::from_rotation_z(std::f32::consts::FRAC_PI_4),
+        _ => Quat::IDENTITY,
+    };
+
     let body = commands
         .spawn((
-            Mesh2d(meshes.add(Circle::new(radius))),
+            Mesh2d(meshes.add(body_mesh)),
             MeshMaterial2d(materials.add(ColorMaterial::from_color(color))),
-            Transform::from_translation(start.extend(10.0)),
+            Transform::from_translation(start.extend(10.0)).with_rotation(rotation),
             Position(start),
             Health::full(enemy_type.base_health() * wave_scale),
-            Enemy {
-                enemy_type,
-                speed: enemy_type.base_speed(),
-                waypoint_index: 0,
-                progress: 0.0,
-                gold_value: enemy_type.gold_value() + bonus_gold,
+            Armor {
+                reduction: enemy_type.armor_reduction(),
             },
+            enemy,
             PathFollower,
             Name::new(format!("Enemy_{enemy_type:?}")),
         ))
         .id();
 
-    // Parent outline under body so it follows automatically.
     commands.entity(body).add_children(&[outline]);
 
-    // Health bar child positioned above the enemy.
     let bar_y = radius + 10.0;
     let health_bar = commands
         .spawn((
@@ -106,24 +122,18 @@ fn fulfill_spawn_requests(
                 ..default()
             },
             Transform::from_translation(Vec3::new(0.0, bar_y, 0.5)),
-            Name::new("HealthBar"),
         ))
         .id();
     commands.entity(body).add_children(&[health_bar]);
-
-    info!(
-        "Spawned {:?} enemy #{} at path start",
-        enemy_type, waves.enemies_spawned
-    );
 }
 
-/// Advance every `PathFollower` along path segments using speed × dt / segment length.
 fn move_path_followers(
     time: Res<Time>,
     map: Res<Map>,
     mut commands: Commands,
     mut stats: ResMut<GameStats>,
     mut waves: ResMut<WaveManager>,
+    stuns: Query<&StunDebuff>,
     mut query: Query<(Entity, &mut Transform, &mut Enemy), With<PathFollower>>,
 ) {
     let path = &map.path;
@@ -134,19 +144,17 @@ fn move_path_followers(
     let dt = time.delta_secs();
 
     for (entity, mut transform, mut enemy) in &mut query {
-        // Already past the last segment → arrived.
-        if enemy.waypoint_index >= path.len() - 1 {
-            stats.lives = stats.lives.saturating_sub(1);
-            info!(
-                "Enemy {:?} reached base! Lives remaining: {}",
-                enemy.enemy_type, stats.lives
-            );
-            commands.entity(entity).despawn_recursive();
-            waves.enemies_alive = waves.enemies_alive.saturating_sub(1);
+        if is_stunned(entity, &stuns) {
             continue;
         }
 
-        // Move across consecutive segments if speed is high enough to finish one in a frame.
+        if enemy.waypoint_index >= path.len() - 1 {
+            stats.lives = stats.lives.saturating_sub(1);
+            waves.enemies_alive = waves.enemies_alive.saturating_sub(1);
+            commands.entity(entity).despawn_recursive();
+            continue;
+        }
+
         let mut remaining_distance = enemy.speed * dt;
 
         while remaining_distance > 0.0 && enemy.waypoint_index < path.len() - 1 {
@@ -162,14 +170,13 @@ fn move_path_followers(
             }
 
             let dist_along = enemy.progress * segment_len;
-            let dist_left_on_segment = segment_len - dist_along;
+            let dist_left = segment_len - dist_along;
 
-            if remaining_distance < dist_left_on_segment {
+            if remaining_distance < dist_left {
                 enemy.progress += remaining_distance / segment_len;
                 remaining_distance = 0.0;
             } else {
-                // Finish this segment and spill into the next.
-                remaining_distance -= dist_left_on_segment;
+                remaining_distance -= dist_left;
                 enemy.waypoint_index += 1;
                 enemy.progress = 0.0;
             }
@@ -177,12 +184,7 @@ fn move_path_followers(
 
         if enemy.waypoint_index >= path.len() - 1 {
             stats.lives = stats.lives.saturating_sub(1);
-            info!(
-                "Enemy {:?} reached base! Lives remaining: {}",
-                enemy.enemy_type, stats.lives
-            );
             waves.enemies_alive = waves.enemies_alive.saturating_sub(1);
-            // Snap to final point for one clean frame if needed, then remove.
             if let Some(last) = path.last() {
                 transform.translation.x = last.x;
                 transform.translation.y = last.y;
@@ -196,14 +198,10 @@ fn move_path_followers(
         let pos = start.lerp(end, enemy.progress);
         transform.translation.x = pos.x;
         transform.translation.y = pos.y;
-        // Keep z stable for draw order above tiles.
         transform.translation.z = 10.0;
     }
 }
 
-/// Keep gameplay `Position` mirrored from `Transform` after movement.
-/// Downstream systems (targeting, UI bars) can read `Position` without
-/// pulling in full transform hierarchies.
 fn sync_position_from_transform(mut query: Query<(&Transform, &mut Position), With<PathFollower>>) {
     for (transform, mut position) in &mut query {
         position.0 = transform.translation.truncate();
