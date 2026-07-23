@@ -21,14 +21,14 @@ mod utils;
 use bevy::prelude::*;
 
 use components::{
-    HitEffect, PathFollower, Projectile, SelectionRing, Tower, TowerEditTarget, TowerLevel,
-    TowerSelection,
+    HitEffect, MainGameCamera, PathFollower, Projectile, SelectionRing, Tower, TowerEditTarget,
+    TowerLevel, TowerSelection,
 };
 use plugins::{
-    wave_plugin::WaveAnnouncement, EnemyPlugin, InputPlugin, MapPlugin, ProjectilePlugin,
-    TowerPlugin, VisualPlugin, WavePlugin,
+    wave_plugin::WaveAnnouncement, CameraPlugin, EnemyPlugin, InputPlugin, MapPlugin,
+    ProjectilePlugin, StatusPlugin, TowerPlugin, VisualPlugin, WavePlugin,
 };
-use resources::{GameStats, WaveManager};
+use resources::{AudioSettings, GameStats, WaveManager};
 
 // ---------------------------------------------------------------------------
 // Application states
@@ -72,10 +72,11 @@ fn main() {
         // --- Global resources ------------------------------------------------
         .init_resource::<GameStats>()
         .init_resource::<WaveManager>()
+        .init_resource::<AudioSettings>()
         // --- States ----------------------------------------------------------
         .init_state::<AppState>()
         // --- Domain plugins --------------------------------------------------
-        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, VisualPlugin, WavePlugin))
+        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, VisualPlugin, WavePlugin, StatusPlugin, CameraPlugin))
         // --- Bootstrap systems ----------------------------------------------
         .add_event::<sfx::SfxRequest>()
         .add_systems(Startup, (setup_camera, setup_menu_ui, setup_game_over_ui, setup_victory_ui, sfx::setup_sfx))
@@ -83,9 +84,10 @@ fn main() {
         .add_systems(OnEnter(AppState::MainMenu), show_menu_ui)
         .add_systems(OnEnter(AppState::Paused), show_paused_banner)
         .add_systems(OnExit(AppState::Paused), hide_paused_banner)
-.add_systems(OnEnter(AppState::GameOver), (show_game_over_ui, cleanup_gameplay, sfx::play_game_over_sfx))
-.add_systems(OnExit(AppState::GameOver), hide_game_over_ui)
-.add_systems(OnEnter(AppState::Victory), (show_victory_ui, cleanup_gameplay, sfx::play_victory_sfx))
+        .add_systems(Update, handle_mute_button.run_if(in_state(AppState::Paused)))
+        .add_systems(OnEnter(AppState::GameOver), (show_game_over_ui, cleanup_gameplay, sfx::play_game_over_sfx))
+        .add_systems(OnExit(AppState::GameOver), hide_game_over_ui)
+        .add_systems(OnEnter(AppState::Victory), (show_victory_ui, cleanup_gameplay, sfx::play_victory_sfx))
         .add_systems(OnExit(AppState::Victory), hide_victory_ui)
         .add_systems(
             Update,
@@ -110,6 +112,7 @@ fn main() {
 fn setup_camera(mut commands: Commands) {
     commands.spawn((
         Camera2d,
+        MainGameCamera,
         // Explicit identity transform at origin — map is already centered.
         Transform::from_xyz(0.0, 0.0, 1000.0),
         Name::new("MainCamera"),
@@ -121,6 +124,9 @@ struct MenuUi;
 
 #[derive(Component)]
 struct PauseBanner;
+
+#[derive(Component)]
+struct MuteMusicButton;
 
 #[derive(Component)]
 struct HudText;
@@ -177,9 +183,9 @@ fn setup_menu_ui(mut commands: Commands) {
                 TextColor(Color::srgb(0.85, 0.85, 0.85)),
             ));
             parent.spawn((
-Text::new(
-    "SPACE/1/2/3 spawn · 4=Arrow 5=Cannon · LMB place/select · U upgrade · S sell · ESC pause",
-),
+                Text::new(
+                    "SPACE/1/2/3 spawn · 4=Arrow 5=Cannon · LMB place/select · U upgrade · S sell · ESC pause",
+                ),
                 TextFont {
                     font_size: 16.0,
                     ..default()
@@ -249,6 +255,27 @@ Text::new(
                 },
                 TextColor(Color::srgb(1.0, 1.0, 1.0)),
             ));
+            parent
+                .spawn((
+                    MuteMusicButton,
+                    Button,
+                    Node {
+                        width: Val::Px(200.0),
+                        height: Val::Px(50.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        margin: UiRect::top(Val::Px(20.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.3, 0.3, 0.3)),
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("Toggle Music"),
+                        TextFont { font_size: 20.0, ..default() },
+                        TextColor(Color::WHITE),
+                    ));
+                });
         });
 }
 
@@ -273,6 +300,18 @@ fn show_paused_banner(mut query: Query<&mut Visibility, With<PauseBanner>>) {
 fn hide_paused_banner(mut query: Query<&mut Visibility, With<PauseBanner>>) {
     for mut vis in &mut query {
         *vis = Visibility::Hidden;
+    }
+}
+
+fn handle_mute_button(
+    mut interactions: Query<&Interaction, (Changed<Interaction>, With<MuteMusicButton>)>,
+    mut settings: ResMut<AudioSettings>,
+) {
+    for interaction in &mut interactions {
+        if *interaction == Interaction::Pressed {
+            settings.music_enabled = !settings.music_enabled;
+            info!("Toggled music enabled to: {}", settings.music_enabled);
+        }
     }
 }
 
