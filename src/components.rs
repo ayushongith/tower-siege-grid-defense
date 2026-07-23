@@ -1,11 +1,4 @@
-//! Core ECS components for Tower Siege: Grid Defense (Day 1).
-//!
-//! Components are pure data. Behaviour lives in systems (plugins).
-//! This separation keeps the architecture scalable for towers, projectiles,
-//! and combat systems in later days.
-
-// Several components are scaffolding for Days 2–5; silence until wired up.
-#![allow(dead_code)]
+//! Core ECS components for Tower Siege: Grid Defense.
 
 use bevy::prelude::*;
 
@@ -13,19 +6,12 @@ use bevy::prelude::*;
 // Spatial / motion
 // ---------------------------------------------------------------------------
 
-/// World-space position (Bevy `Transform` is the render source of truth;
-/// we keep `Position` in sync for gameplay queries that should not depend on
-/// render hierarchy).
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Position(pub Vec2);
 
-/// Linear velocity in world units per second. Reserved for projectiles / knockback
-/// on later days; enemies primarily use path following instead.
 #[derive(Component, Debug, Clone, Copy, Default)]
 pub struct Velocity(pub Vec2);
 
-/// Hit points. Day 1 does not apply damage yet, but the component is ready
-/// so Day 2 towers can reduce `current` without a data-model rewrite.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Health {
     pub current: f32,
@@ -38,12 +24,15 @@ impl Health {
     }
 }
 
+#[derive(Component, Debug, Clone, Copy, Default)]
+pub struct Armor {
+    pub reduction: f32,
+}
+
 // ---------------------------------------------------------------------------
 // Grid
 // ---------------------------------------------------------------------------
 
-/// Discrete tile coordinate on the map grid.
-/// `col` grows right, `row` grows up (matches Bevy's Y-up world).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct GridPosition {
     pub col: usize,
@@ -54,14 +43,15 @@ pub struct GridPosition {
 // Enemies
 // ---------------------------------------------------------------------------
 
-/// High-level enemy archetype. Stats are duplicated onto `Enemy` at spawn time
-/// so runtime tuning / buffs do not require looking up a global table every frame.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
 pub enum EnemyType {
     #[default]
     Normal,
     Fast,
     Tank,
+    Armored,
+    Swarm,
+    Boss,
 }
 
 impl EnemyType {
@@ -70,6 +60,9 @@ impl EnemyType {
             EnemyType::Normal => 80.0,
             EnemyType::Fast => 140.0,
             EnemyType::Tank => 45.0,
+            EnemyType::Armored => 55.0,
+            EnemyType::Swarm => 100.0,
+            EnemyType::Boss => 35.0,
         }
     }
 
@@ -78,6 +71,9 @@ impl EnemyType {
             EnemyType::Normal => 50.0,
             EnemyType::Fast => 30.0,
             EnemyType::Tank => 150.0,
+            EnemyType::Armored => 80.0,
+            EnemyType::Swarm => 12.0,
+            EnemyType::Boss => 800.0,
         }
     }
 
@@ -86,6 +82,17 @@ impl EnemyType {
             EnemyType::Normal => 10,
             EnemyType::Fast => 15,
             EnemyType::Tank => 25,
+            EnemyType::Armored => 20,
+            EnemyType::Swarm => 4,
+            EnemyType::Boss => 150,
+        }
+    }
+
+    pub fn armor_reduction(self) -> f32 {
+        match self {
+            EnemyType::Armored => 0.40,
+            EnemyType::Boss => 0.25,
+            _ => 0.0,
         }
     }
 
@@ -94,6 +101,9 @@ impl EnemyType {
             EnemyType::Normal => Color::srgb(0.90, 0.20, 0.20),
             EnemyType::Fast => Color::srgb(1.00, 0.55, 0.15),
             EnemyType::Tank => Color::srgb(0.55, 0.15, 0.15),
+            EnemyType::Armored => Color::srgb(0.50, 0.50, 0.60),
+            EnemyType::Swarm => Color::srgb(0.85, 0.35, 0.85),
+            EnemyType::Boss => Color::srgb(0.70, 0.10, 0.70),
         }
     }
 
@@ -102,21 +112,26 @@ impl EnemyType {
             EnemyType::Normal => 16.0,
             EnemyType::Fast => 12.0,
             EnemyType::Tank => 22.0,
+            EnemyType::Armored => 18.0,
+            EnemyType::Swarm => 8.0,
+            EnemyType::Boss => 32.0,
+        }
+    }
+
+    pub fn sides(self) -> u32 {
+        match self {
+            EnemyType::Fast | EnemyType::Swarm => 4,
+            EnemyType::Tank | EnemyType::Armored => 6,
+            EnemyType::Boss => 8,
+            EnemyType::Normal => 0,
         }
     }
 }
 
-/// Path-following enemy state.
-///
-/// Movement model (Day 1):
-/// - `waypoint_index` = index of the *current segment start* in `Map.path`
-/// - `progress` ∈ [0, 1) = interpolation factor toward the next waypoint
-///
-/// This is more stable than pure velocity steering for grid paths and makes
-/// future features (slow debuffs, path re-routing) easier to reason about.
 #[derive(Component, Debug, Clone)]
 pub struct Enemy {
     pub enemy_type: EnemyType,
+    pub base_speed: f32,
     pub speed: f32,
     pub waypoint_index: usize,
     pub progress: f32,
@@ -125,9 +140,11 @@ pub struct Enemy {
 
 impl Enemy {
     pub fn new(enemy_type: EnemyType) -> Self {
+        let base_speed = enemy_type.base_speed();
         Self {
             enemy_type,
-            speed: enemy_type.base_speed(),
+            base_speed,
+            speed: base_speed,
             waypoint_index: 0,
             progress: 0.0,
             gold_value: enemy_type.gold_value(),
@@ -135,45 +152,79 @@ impl Enemy {
     }
 }
 
-/// Marker: this entity should be advanced along `Map.path` by the enemy plugin.
 #[derive(Component, Debug, Default)]
 pub struct PathFollower;
 
 // ---------------------------------------------------------------------------
-// Map visuals (markers so we can query tiles later for placement rules)
+// Status effects
 // ---------------------------------------------------------------------------
 
-/// Marker for a single map tile entity.
+#[derive(Component, Debug)]
+pub struct SlowDebuff {
+    pub factor: f32,
+    pub timer: Timer,
+}
+
+#[derive(Component, Debug)]
+pub struct BurnDebuff {
+    pub dps: f32,
+    pub timer: Timer,
+    pub tick: Timer,
+}
+
+#[derive(Component, Debug)]
+pub struct StunDebuff {
+    pub timer: Timer,
+}
+
+// ---------------------------------------------------------------------------
+// Map visuals
+// ---------------------------------------------------------------------------
+
 #[derive(Component, Debug)]
 pub struct MapTile;
 
-/// Marker for the spawn pad visual.
 #[derive(Component, Debug)]
 pub struct SpawnMarker;
 
-/// Marker for the base / exit visual.
 #[derive(Component, Debug)]
 pub struct BaseMarker;
 
-/// Marker for path waypoint dots (debug / readability).
 #[derive(Component, Debug)]
 pub struct PathWaypointMarker;
 
+#[derive(Component, Debug)]
+pub struct MapDecoration;
+
 // ---------------------------------------------------------------------------
-// Towers (Day 2)
+// Towers
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TowerType {
     Arrow,
     Cannon,
+    Slow,
+    Sniper,
+    Tesla,
 }
 
 impl TowerType {
+    pub const ALL: [TowerType; 5] = [
+        TowerType::Arrow,
+        TowerType::Cannon,
+        TowerType::Slow,
+        TowerType::Sniper,
+        TowerType::Tesla,
+    ];
+
     pub fn cost(self) -> u32 {
         match self {
             TowerType::Arrow => 50,
             TowerType::Cannon => 100,
+            TowerType::Slow => 75,
+            TowerType::Sniper => 120,
+            TowerType::Tesla => 150,
         }
     }
 
@@ -181,6 +232,9 @@ impl TowerType {
         match self {
             TowerType::Arrow => 150.0,
             TowerType::Cannon => 120.0,
+            TowerType::Slow => 130.0,
+            TowerType::Sniper => 250.0,
+            TowerType::Tesla => 140.0,
         }
     }
 
@@ -188,6 +242,9 @@ impl TowerType {
         match self {
             TowerType::Arrow => 15.0,
             TowerType::Cannon => 40.0,
+            TowerType::Slow => 8.0,
+            TowerType::Sniper => 55.0,
+            TowerType::Tesla => 18.0,
         }
     }
 
@@ -195,13 +252,72 @@ impl TowerType {
         match self {
             TowerType::Arrow => 1.0,
             TowerType::Cannon => 2.0,
+            TowerType::Slow => 1.2,
+            TowerType::Sniper => 3.0,
+            TowerType::Tesla => 1.5,
         }
+    }
+
+    pub fn splash_radius(self) -> f32 {
+        match self {
+            TowerType::Cannon => 55.0,
+            _ => 0.0,
+        }
+    }
+
+    pub fn chain_count(self) -> u32 {
+        match self {
+            TowerType::Tesla => 3,
+            _ => 0,
+        }
+    }
+
+    pub fn chain_range(self) -> f32 {
+        match self {
+            TowerType::Tesla => 80.0,
+            _ => 0.0,
+        }
+    }
+
+    pub fn applies_slow(self) -> bool {
+        matches!(self, TowerType::Slow)
+    }
+
+    pub fn slow_factor(self) -> f32 {
+        if self.applies_slow() { 0.45 } else { 1.0 }
+    }
+
+    pub fn slow_duration(self) -> f32 {
+        if self.applies_slow() { 2.5 } else { 0.0 }
     }
 
     pub fn color(self) -> Color {
         match self {
             TowerType::Arrow => Color::srgb(0.20, 0.75, 0.40),
             TowerType::Cannon => Color::srgb(0.75, 0.30, 0.20),
+            TowerType::Slow => Color::srgb(0.25, 0.55, 0.90),
+            TowerType::Sniper => Color::srgb(0.55, 0.55, 0.65),
+            TowerType::Tesla => Color::srgb(0.45, 0.85, 0.95),
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            TowerType::Arrow => "Arrow",
+            TowerType::Cannon => "Cannon",
+            TowerType::Slow => "Slow",
+            TowerType::Sniper => "Sniper",
+            TowerType::Tesla => "Tesla",
+        }
+    }
+
+    pub fn hotkey(self) -> KeyCode {
+        match self {
+            TowerType::Arrow => KeyCode::Digit4,
+            TowerType::Cannon => KeyCode::Digit5,
+            TowerType::Slow => KeyCode::Digit6,
+            TowerType::Sniper => KeyCode::Digit7,
+            TowerType::Tesla => KeyCode::Digit8,
         }
     }
 }
@@ -213,6 +329,7 @@ pub struct Tower {
     pub damage: f32,
     pub fire_rate: f32,
     pub cooldown: Timer,
+    pub target_entity: Option<Entity>,
     pub targeting_pos: Vec2,
 }
 
@@ -224,40 +341,49 @@ impl Tower {
             damage: tower_type.damage(),
             fire_rate: tower_type.fire_rate(),
             cooldown: Timer::from_seconds(tower_type.fire_rate(), TimerMode::Repeating),
+            target_entity: None,
             targeting_pos: Vec2::ZERO,
         }
     }
 }
 
-/// Marker for tower range preview circle.
+#[derive(Component, Debug)]
+pub struct TowerTurret;
+
 #[derive(Component, Debug)]
 pub struct TowerRangePreview;
 
+#[derive(Component, Debug)]
+pub struct TowerPlacementGhost;
+
 // ---------------------------------------------------------------------------
-// Projectiles (Day 2)
+// Projectiles
 // ---------------------------------------------------------------------------
 
 #[derive(Component, Debug, Clone)]
 pub struct Projectile {
-    pub target_pos: Vec2,
+    pub target: Option<Entity>,
     pub speed: f32,
     pub damage: f32,
+    pub splash_radius: f32,
+    pub chain_remaining: u32,
+    pub chain_range: f32,
+    pub tower_type: TowerType,
+    pub source_tower: Option<Entity>,
 }
+
+// ---------------------------------------------------------------------------
+// Selection / upgrades
+// ---------------------------------------------------------------------------
 
 #[derive(Resource, Debug, Default)]
 pub struct TowerSelection {
     pub selected: Option<TowerType>,
 }
 
-// ---------------------------------------------------------------------------
-// Day 4 — Upgrades, Visual Feedback
-// ---------------------------------------------------------------------------
-
-/// Marker for an enemy health bar child entity.
 #[derive(Component, Debug)]
 pub struct HealthBar;
 
-/// Tracks tower upgrade level and total gold invested (for sell-back).
 #[derive(Component, Debug, Clone)]
 pub struct TowerLevel {
     pub level: u32,
@@ -267,18 +393,19 @@ pub struct TowerLevel {
 
 impl TowerLevel {
     pub fn new(base_cost: u32) -> Self {
-        Self { level: 1, max_level: 3, total_invested: base_cost }
+        Self {
+            level: 1,
+            max_level: 3,
+            total_invested: base_cost,
+        }
     }
 }
 
-/// Temporary hit-effect particle that despawns after its timer expires.
 #[derive(Component, Debug)]
 pub struct HitEffect {
     pub timer: Timer,
 }
 
-/// Resource: which existing tower entity the player has selected for
-/// upgrade / sell actions. Cleared when placing a new tower type.
 #[derive(Resource, Debug, Default)]
 pub struct TowerEditTarget {
     pub entity: Option<Entity>,
@@ -286,6 +413,36 @@ pub struct TowerEditTarget {
     pub row: usize,
 }
 
-/// Marker for the selection ring sprite (child of a selected tower).
 #[derive(Component, Debug)]
 pub struct SelectionRing;
+
+#[derive(Component, Debug)]
+pub struct ChainLightningFx {
+    pub timer: Timer,
+}
+
+// ---------------------------------------------------------------------------
+// Camera
+// ---------------------------------------------------------------------------
+
+#[derive(Component, Debug)]
+pub struct MainGameCamera;
+
+#[derive(Resource, Debug)]
+pub struct CameraController {
+    pub pan_speed: f32,
+    pub zoom: f32,
+    pub min_zoom: f32,
+    pub max_zoom: f32,
+}
+
+impl Default for CameraController {
+    fn default() -> Self {
+        Self {
+            pan_speed: 420.0,
+            zoom: 1.0,
+            min_zoom: 0.5,
+            max_zoom: 2.5,
+        }
+    }
+}
