@@ -234,7 +234,18 @@ pub fn load_map_by_index(index: usize) -> Map {
 pub fn available_maps() -> Vec<MapDefinition> {
     let mut maps = Vec::new();
 
-    for file in ["maps/classic.ron", "maps/zigzag.ron", "maps/arena.ron"] {
+    for file in [
+        "maps/intro.ron",
+        "maps/classic.ron",
+        "maps/zigzag.ron",
+        "maps/serpentine.ron",
+        "maps/arena.ron",
+        "maps/staircase.ron",
+        "maps/spiral.ron",
+        "maps/ubend.ron",
+        "maps/switchback.ron",
+        "maps/maze.ron",
+    ] {
         if let Ok(text) = std::fs::read_to_string(format!("assets/{file}")) {
             if let Ok(def) = ron::from_str::<MapDefinition>(&text) {
                 maps.push(def);
@@ -244,33 +255,16 @@ pub fn available_maps() -> Vec<MapDefinition> {
     }
 
     if maps.is_empty() {
-        maps.push(MapDefinition {
-            name: "Classic".into(),
-            width: Map::WIDTH,
-            height: Map::HEIGHT,
-            grid_path: vec![
-                (0, 4), (2, 4), (2, 7), (5, 7), (5, 2), (8, 2), (8, 8), (11, 8), (11, 3),
-                (13, 3), (13, 6), (14, 6),
-            ],
-        });
-        maps.push(MapDefinition {
-            name: "Zigzag".into(),
-            width: Map::WIDTH,
-            height: Map::HEIGHT,
-            grid_path: vec![
-                (0, 1), (3, 1), (3, 8), (6, 8), (6, 2), (9, 2), (9, 7), (12, 7), (12, 4),
-                (14, 4),
-            ],
-        });
-        maps.push(MapDefinition {
-            name: "Arena".into(),
-            width: Map::WIDTH,
-            height: Map::HEIGHT,
-            grid_path: vec![
-                (0, 5), (4, 5), (4, 1), (7, 1), (7, 9), (10, 9), (10, 3), (13, 3), (13, 6),
-                (14, 6),
-            ],
-        });
+        maps.push(MapDefinition { name: "Intro".into(), width: Map::WIDTH, height: Map::HEIGHT, grid_path: vec![(0, 4), (14, 4)] });
+        maps.push(MapDefinition { name: "Classic".into(), width: Map::WIDTH, height: Map::HEIGHT, grid_path: vec![(0, 4), (2, 4), (2, 7), (5, 7), (5, 2), (8, 2), (8, 8), (11, 8), (11, 3), (13, 3), (13, 6), (14, 6)] });
+        maps.push(MapDefinition { name: "Zigzag".into(), width: Map::WIDTH, height: Map::HEIGHT, grid_path: vec![(0, 1), (3, 1), (3, 8), (6, 8), (6, 2), (9, 2), (9, 7), (12, 7), (12, 4), (14, 4)] });
+        maps.push(MapDefinition { name: "Serpentine".into(), width: Map::WIDTH, height: Map::HEIGHT, grid_path: vec![(0, 5), (3, 5), (3, 1), (7, 1), (7, 9), (11, 9), (11, 5), (14, 5)] });
+        maps.push(MapDefinition { name: "Arena".into(), width: Map::WIDTH, height: Map::HEIGHT, grid_path: vec![(0, 5), (4, 5), (4, 1), (7, 1), (7, 9), (10, 9), (10, 3), (13, 3), (13, 6), (14, 6)] });
+        maps.push(MapDefinition { name: "Staircase".into(), width: Map::WIDTH, height: Map::HEIGHT, grid_path: vec![(0, 8), (3, 8), (3, 5), (6, 5), (6, 2), (9, 2), (9, 8), (12, 8), (12, 5), (14, 5)] });
+        maps.push(MapDefinition { name: "Spiral".into(), width: Map::WIDTH, height: Map::HEIGHT, grid_path: vec![(0, 4), (4, 4), (4, 1), (10, 1), (10, 8), (3, 8), (3, 5), (7, 5), (7, 3), (11, 3), (11, 6), (14, 6)] });
+        maps.push(MapDefinition { name: "U-Bend".into(), width: Map::WIDTH, height: Map::HEIGHT, grid_path: vec![(0, 4), (2, 4), (2, 1), (12, 1), (12, 8), (4, 8), (4, 3), (10, 3), (10, 6), (14, 6)] });
+        maps.push(MapDefinition { name: "Switchback".into(), width: Map::WIDTH, height: Map::HEIGHT, grid_path: vec![(0, 8), (2, 8), (2, 1), (5, 1), (5, 8), (8, 8), (8, 1), (11, 1), (11, 8), (14, 8)] });
+        maps.push(MapDefinition { name: "Maze".into(), width: Map::WIDTH, height: Map::HEIGHT, grid_path: vec![(0, 5), (3, 5), (3, 8), (1, 8), (1, 2), (5, 2), (5, 6), (8, 6), (8, 1), (11, 1), (11, 7), (9, 7), (9, 4), (13, 4), (13, 9), (14, 9)] });
     }
 
     maps
@@ -536,5 +530,56 @@ pub struct RunScore {
 impl Default for RunScore {
     fn default() -> Self {
         Self { value: 0 }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Level progression
+// ---------------------------------------------------------------------------
+
+#[derive(Resource, Debug, Clone)]
+pub struct LevelManager {
+    pub current_level: u32,
+    pub max_level: u32,
+    pub waves_per_level: u32,
+}
+
+impl Default for LevelManager {
+    fn default() -> Self {
+        Self {
+            current_level: 1,
+            max_level: 100,
+            waves_per_level: 5,
+        }
+    }
+}
+
+impl LevelManager {
+    pub fn map_index(&self) -> usize {
+        ((self.current_level - 1) / 10) as usize % 10
+    }
+
+    pub fn hp_mult(&self) -> f32 {
+        1.0 + (self.current_level as f32 - 1.0) * 0.06
+    }
+
+    pub fn speed_mult(&self) -> f32 {
+        1.0 + (self.current_level as f32 - 1.0) * 0.015
+    }
+
+    pub fn starting_gold(&self) -> u32 {
+        200 + self.current_level * 10
+    }
+
+    pub fn target_wave(&self) -> u32 {
+        self.current_level * self.waves_per_level
+    }
+
+    pub fn is_level_complete(&self, current_wave: u32, enemies_alive: u32) -> bool {
+        current_wave >= self.target_wave() && enemies_alive == 0
+    }
+
+    pub fn is_game_complete(&self) -> bool {
+        self.current_level >= self.max_level
     }
 }

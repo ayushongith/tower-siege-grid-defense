@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 use crate::components::{Armor, Enemy, EnemyType, Health, HealthBar, PathFollower, Position, StunDebuff};
 use crate::plugins::status_plugin::is_stunned;
-use crate::resources::{GameSettings, GameStats, Map, WaveManager, WaveModifier};
+use crate::resources::{GameSettings, GameStats, LevelManager, Map, WaveManager, WaveModifier};
 use crate::AppState;
 
 #[derive(Resource, Debug, Default)]
@@ -35,6 +35,7 @@ fn fulfill_spawn_requests(
     mut commands: Commands,
     mut request: ResMut<SpawnEnemyRequest>,
     waves: Res<WaveManager>,
+    level: Res<LevelManager>,
     map: Res<Map>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -53,7 +54,9 @@ fn fulfill_spawn_requests(
     let color = enemy_type.color();
     let wave_scale = 1.0 + (waves.current_wave.saturating_sub(1) as f32) * 0.10;
 
-    let speed_mult = if waves.modifier == WaveModifier::Fast { 1.35 } else { 1.0 };
+    let hp_mult = level.hp_mult();
+    let speed_mult = level.speed_mult()
+        * if waves.modifier == WaveModifier::Fast { 1.35 } else { 1.0 };
 
     let body_mesh: Mesh = if enemy_type.sides() > 0 {
         Mesh::from(RegularPolygon {
@@ -100,7 +103,7 @@ fn fulfill_spawn_requests(
             MeshMaterial2d(materials.add(ColorMaterial::from_color(color))),
             Transform::from_translation(start.extend(10.0)).with_rotation(rotation),
             Position(start),
-            Health::full(enemy_type.base_health() * wave_scale),
+            Health::full(enemy_type.base_health() * wave_scale * hp_mult),
             Armor {
                 reduction: enemy_type.armor_reduction(),
             },

@@ -18,6 +18,7 @@ mod resources;
 mod sfx;
 mod utils;
 
+use bevy::audio::AddAudioSource;
 use bevy::prelude::*;
 
 use components::{
@@ -28,7 +29,7 @@ use plugins::{
     wave_plugin::WaveAnnouncement, CameraPlugin, EnemyPlugin, InputPlugin, MapPlugin,
     ProjectilePlugin, StatusPlugin, TowerPlugin, VisualPlugin, WavePlugin,
 };
-use resources::{AudioSettings, GameStats, WaveManager};
+use resources::{AudioSettings, GameStats, LevelManager, WaveManager};
 
 // ---------------------------------------------------------------------------
 // Application states
@@ -41,6 +42,7 @@ pub enum AppState {
     #[default]
     MainMenu,
     Playing,
+    LevelTransition,
     Paused,
     GameOver,
     Victory,
@@ -73,10 +75,12 @@ fn main() {
         .init_resource::<GameStats>()
         .init_resource::<WaveManager>()
         .init_resource::<AudioSettings>()
+        .init_resource::<LevelManager>()
         // --- States ----------------------------------------------------------
         .init_state::<AppState>()
         // --- Domain plugins --------------------------------------------------
         .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, VisualPlugin, WavePlugin, StatusPlugin, CameraPlugin))
+        .add_audio_source::<sfx::SfxSource>()
         // --- Bootstrap systems ----------------------------------------------
         .add_event::<sfx::SfxRequest>()
         .add_systems(Startup, (setup_camera, setup_menu_ui, setup_game_over_ui, setup_victory_ui, sfx::setup_sfx))
@@ -85,6 +89,7 @@ fn main() {
         .add_systems(OnEnter(AppState::Paused), show_paused_banner)
         .add_systems(OnExit(AppState::Paused), hide_paused_banner)
         .add_systems(Update, handle_mute_button.run_if(in_state(AppState::Paused)))
+        .add_systems(OnEnter(AppState::LevelTransition), (advance_level, cleanup_gameplay))
         .add_systems(OnEnter(AppState::GameOver), (show_game_over_ui, cleanup_gameplay, sfx::play_game_over_sfx))
         .add_systems(OnExit(AppState::GameOver), hide_game_over_ui)
         .add_systems(OnEnter(AppState::Victory), (show_victory_ui, cleanup_gameplay, sfx::play_victory_sfx))
@@ -318,6 +323,7 @@ fn handle_mute_button(
 fn update_hud(
     stats: Res<GameStats>,
     waves: Res<WaveManager>,
+    level: Res<LevelManager>,
     tower_sel: Res<TowerSelection>,
     edit_target: Res<TowerEditTarget>,
     towers: Query<(&Tower, &TowerLevel)>,
@@ -330,13 +336,13 @@ fn update_hud(
         if let Some(t) = tower_sel.selected {
             hints.push_str(&format!(" [placing {:?} tower - click buildable tile]", t));
         } else if let Some(entity) = edit_target.entity {
-            if let Ok((tower, level)) = towers.get(entity) {
+            if let Ok((tower, tower_lv)) = towers.get(entity) {
                 hints.push_str(&format!(
                     " [select {:?} Lv{} - U upgrade({}g) | S sell({}g)]",
                     tower.tower_type,
-                    level.level,
-                    crate::plugins::tower_plugin::upgrade_cost(level.level, tower.tower_type.cost()),
-                    (level.total_invested as f32 * 0.5).round() as u32,
+                    tower_lv.level,
+                    crate::plugins::tower_plugin::upgrade_cost(tower_lv.level, tower.tower_type.cost()),
+                    (tower_lv.total_invested as f32 * 0.5).round() as u32,
                 ));
             }
         }
@@ -351,8 +357,8 @@ fn update_hud(
             "Enemies: 0".to_string()
         };
         *text = Text::new(format!(
-            "Gold: {}   Lives: {}   Wave: {}   {}   Spawned: {}{}",
-            stats.gold, stats.lives, waves.current_wave, wave_info, waves.enemies_spawned, hints
+            "Lv{}  Gold: {}  Lives: {}  Wave: {}  {}  Spawned: {}{}",
+            level.current_level, stats.gold, stats.lives, waves.current_wave, wave_info, waves.enemies_spawned, hints
         ));
     }
 }
@@ -488,14 +494,40 @@ fn detect_game_over(
     }
 }
 
-/// Transition to Victory after clearing enough waves.
+/// Transition to next level or final victory after clearing all waves.
 fn detect_victory(
     waves: Res<WaveManager>,
+    level: Res<LevelManager>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    // Victory after clearing wave 10 (after it enters Idle from Complete)
-    if waves.current_wave >= 10 && waves.state == crate::resources::WaveState::Idle && waves.enemies_alive == 0 {
-        info!("Victory — all 10 waves cleared!");
-        next_state.set(AppState::Victory);
+    if !level.is_level_complete(waves.current_wave, waves.enemies_alive) {
+        return;
     }
+    if level.is_game_complete() {
+        info!("Victory — all {} levels cleared!", level.max_level);
+        next_state.set(AppState::Victory);
+    } else {
+        info!("Level {} complete! Advancing...", level.current_level);
+        next_state.set(AppState::LevelTransition);
+    }
+}
+
+/// Advance to next level on LevelTransition enter.
+fn advance_level(
+    mut level: ResMut<LevelManager>,
+    mut stats: ResMut<GameStats>,
+    mut waves: ResMut<WaveManager>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    level.current_level += 1;
+    *stats = GameStats {
+        gold: level.starting_gold(),
+        ..default()
+    };
+    *waves = WaveManager {
+        current_wave: (level.current_level - 1) * level.waves_per_level,
+        ..default()
+    };
+    info!("Level {} — Map {} — Starting gold: {}", level.current_level, level.map_index() + 1, stats.gold);
+    next_state.set(AppState::Playing);
 }

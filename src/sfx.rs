@@ -1,145 +1,139 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use bevy::audio::{AudioPlayer, PlaybackSettings};
 use bevy::prelude::*;
-use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings};
 
 // ---------------------------------------------------------------------------
-// WAV file generation (no external crates needed)
+// Custom decodable audio source — raw PCM f32 samples, no file format needed.
 // ---------------------------------------------------------------------------
 
-fn generate_wav_sine(freq: f32, duration_secs: f32, sample_rate: u32) -> Vec<u8> {
-    let num_samples = (sample_rate as f32 * duration_secs) as usize;
-    let data_len = num_samples * 2; // 16-bit mono
-    let file_size = 44 + data_len;
-
-    let mut wav = Vec::with_capacity(file_size);
-
-    // RIFF header
-    wav.extend(b"RIFF");
-    wav.extend(&(file_size as u32 - 8).to_le_bytes());
-    wav.extend(b"WAVE");
-
-    // fmt chunk
-    wav.extend(b"fmt ");
-    wav.extend(&16u32.to_le_bytes()); // chunk size
-    wav.extend(&1u16.to_le_bytes());  // PCM
-    wav.extend(&1u16.to_le_bytes());  // mono
-    wav.extend(&sample_rate.to_le_bytes());
-    wav.extend(&(sample_rate * 2).to_le_bytes()); // byte rate
-    wav.extend(&2u16.to_le_bytes());  // block align
-    wav.extend(&16u16.to_le_bytes()); // bits per sample
-
-    // data chunk
-    wav.extend(b"data");
-    wav.extend(&(data_len as u32).to_le_bytes());
-
-    // PCM samples (16-bit signed)
-    for i in 0..num_samples {
-        let t = i as f32 / sample_rate as f32;
-        let envelope = {
-            let attack = (i as f32 / (sample_rate as f32 * 0.01)).min(1.0);
-            let release = ((num_samples - i) as f32 / (sample_rate as f32 * 0.02)).min(1.0);
-            attack.min(release) * 0.30
-        };
-        let sample = (t * freq * std::f32::consts::TAU).sin() * envelope;
-        let amplitude = (sample * 32767.0) as i16;
-        wav.extend(&amplitude.to_le_bytes());
-    }
-
-    wav
+#[derive(Asset, Debug, Clone, TypePath)]
+pub struct SfxSource {
+    samples: Arc<[f32]>,
+    sample_rate: u32,
 }
 
-fn generate_wav_sweep(start_freq: f32, end_freq: f32, duration_secs: f32, sample_rate: u32) -> Vec<u8> {
-    let num_samples = (sample_rate as f32 * duration_secs) as usize;
-    let data_len = num_samples * 2;
-    let file_size = 44 + data_len;
-
-    let mut wav = Vec::with_capacity(file_size);
-
-    wav.extend(b"RIFF");
-    wav.extend(&(file_size as u32 - 8).to_le_bytes());
-    wav.extend(b"WAVE");
-    wav.extend(b"fmt ");
-    wav.extend(&16u32.to_le_bytes());
-    wav.extend(&1u16.to_le_bytes());
-    wav.extend(&1u16.to_le_bytes());
-    wav.extend(&sample_rate.to_le_bytes());
-    wav.extend(&(sample_rate * 2).to_le_bytes());
-    wav.extend(&2u16.to_le_bytes());
-    wav.extend(&16u16.to_le_bytes());
-    wav.extend(b"data");
-    wav.extend(&(data_len as u32).to_le_bytes());
-
-    for i in 0..num_samples {
-        let t = i as f32 / sample_rate as f32;
-        let freq = start_freq + (end_freq - start_freq) * (t / duration_secs).min(1.0);
-        let envelope = {
-            let attack = (i as f32 / (sample_rate as f32 * 0.01)).min(1.0);
-            let release = ((num_samples - i) as f32 / (sample_rate as f32 * 0.02)).min(1.0);
-            attack.min(release) * 0.30
-        };
-        let sample = (t * freq * std::f32::consts::TAU).sin() * envelope;
-        let amplitude = (sample * 32767.0) as i16;
-        wav.extend(&amplitude.to_le_bytes());
-    }
-
-    wav
+pub struct SfxDecoder {
+    samples: Arc<[f32]>,
+    sample_rate: u32,
+    channels: u16,
+    index: usize,
 }
 
-// ---------------------------------------------------------------------------
-// Asset handles resource
-// ---------------------------------------------------------------------------
+impl Iterator for SfxDecoder {
+    type Item = f32;
+    fn next(&mut self) -> Option<f32> {
+        if self.index < self.samples.len() {
+            let s = self.samples[self.index];
+            self.index += 1;
+            Some(s)
+        } else {
+            None
+        }
+    }
+}
+
+impl bevy::audio::Source for SfxDecoder {
+    fn current_frame_len(&self) -> Option<usize> {
+        Some(self.samples.len().saturating_sub(self.index))
+    }
+    fn channels(&self) -> u16 {
+        self.channels
+    }
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+    fn total_duration(&self) -> Option<Duration> {
+        Some(Duration::from_secs_f32(
+            self.samples.len() as f32 / self.sample_rate as f32 / self.channels as f32,
+        ))
+    }
+}
+
+impl bevy::audio::Decodable for SfxSource {
+    type DecoderItem = f32;
+    type Decoder = SfxDecoder;
+
+    fn decoder(&self) -> Self::Decoder {
+        SfxDecoder {
+            samples: self.samples.clone(),
+            sample_rate: self.sample_rate,
+            channels: 1,
+            index: 0,
+        }
+    }
+}
+
+fn gen_samples(freq: f32, duration_secs: f32, sample_rate: u32) -> Arc<[f32]> {
+    let count = (sample_rate as f32 * duration_secs) as usize;
+    let mut s = Vec::with_capacity(count);
+    for i in 0..count {
+        let t = i as f32 / sample_rate as f32;
+        let envelope = {
+            let a = (i as f32 / (sample_rate as f32 * 0.01)).min(1.0);
+            let r = ((count - i) as f32 / (sample_rate as f32 * 0.02)).min(1.0);
+            a.min(r) * 0.30
+        };
+        s.push((t * freq * std::f32::consts::TAU).sin() * envelope);
+    }
+    s.into()
+}
+
+fn gen_sweep(start: f32, end: f32, duration_secs: f32, sr: u32) -> Arc<[f32]> {
+    let count = (sr as f32 * duration_secs) as usize;
+    let mut s = Vec::with_capacity(count);
+    for i in 0..count {
+        let t = i as f32 / sr as f32;
+        let freq = start + (end - start) * (t / duration_secs).min(1.0);
+        let envelope = {
+            let a = (i as f32 / (sr as f32 * 0.01)).min(1.0);
+            let r = ((count - i) as f32 / (sr as f32 * 0.02)).min(1.0);
+            a.min(r) * 0.30
+        };
+        s.push((t * freq * std::f32::consts::TAU).sin() * envelope);
+    }
+    s.into()
+}
 
 #[derive(Resource, Debug)]
 pub struct SfxHandles {
-    pub shoot: Handle<AudioSource>,
-    pub hit: Handle<AudioSource>,
-    pub kill: Handle<AudioSource>,
-    pub wave_start: Handle<AudioSource>,
-    pub game_over: Handle<AudioSource>,
-    pub victory: Handle<AudioSource>,
+    pub shoot: Handle<SfxSource>,
+    pub hit: Handle<SfxSource>,
+    pub kill: Handle<SfxSource>,
+    pub wave_start: Handle<SfxSource>,
+    pub game_over: Handle<SfxSource>,
+    pub victory: Handle<SfxSource>,
 }
 
-/// Write all sound-effect WAV files to disk, then load them via AssetServer.
-pub fn setup_sfx(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let dir = "assets/sounds";
-    std::fs::create_dir_all(dir).ok();
-
-    std::fs::write(format!("{dir}/shoot.wav"), &generate_wav_sine(880.0, 0.08, 44100)).ok();
-    std::fs::write(format!("{dir}/hit.wav"), &generate_wav_sine(220.0, 0.06, 44100)).ok();
-    std::fs::write(format!("{dir}/kill.wav"), &generate_wav_sweep(440.0, 880.0, 0.15, 44100)).ok();
-    std::fs::write(format!("{dir}/wave_start.wav"), &generate_wav_sweep(440.0, 660.0, 0.3, 44100)).ok();
-    std::fs::write(format!("{dir}/game_over.wav"), &generate_wav_sweep(440.0, 110.0, 0.5, 44100)).ok();
-    std::fs::write(format!("{dir}/victory.wav"), &generate_wav_sweep(440.0, 880.0, 0.5, 44100)).ok();
-
+pub fn setup_sfx(mut commands: Commands, mut assets: ResMut<Assets<SfxSource>>) {
+    let sr = 44100;
     commands.insert_resource(SfxHandles {
-        shoot: asset_server.load("sounds/shoot.wav"),
-        hit: asset_server.load("sounds/hit.wav"),
-        kill: asset_server.load("sounds/kill.wav"),
-        wave_start: asset_server.load("sounds/wave_start.wav"),
-        game_over: asset_server.load("sounds/game_over.wav"),
-        victory: asset_server.load("sounds/victory.wav"),
+        shoot: assets.add(SfxSource { samples: gen_samples(880.0, 0.08, sr), sample_rate: sr }),
+        hit: assets.add(SfxSource { samples: gen_samples(220.0, 0.06, sr), sample_rate: sr }),
+        kill: assets.add(SfxSource { samples: gen_sweep(440.0, 880.0, 0.15, sr), sample_rate: sr }),
+        wave_start: assets.add(SfxSource { samples: gen_sweep(440.0, 660.0, 0.3, sr), sample_rate: sr }),
+        game_over: assets.add(SfxSource { samples: gen_sweep(440.0, 110.0, 0.5, sr), sample_rate: sr }),
+        victory: assets.add(SfxSource { samples: gen_sweep(440.0, 880.0, 0.5, sr), sample_rate: sr }),
     });
 }
 
-/// Play a one-shot sound effect.
-pub fn play_sfx(commands: &mut Commands, handle: &Handle<AudioSource>) {
+pub fn play_sfx(commands: &mut Commands, handle: &Handle<SfxSource>) {
     commands.spawn((
-        AudioPlayer::new(handle.clone()),
+        AudioPlayer::<SfxSource>(handle.clone()),
         PlaybackSettings::ONCE,
         Name::new("SfxPlayer"),
     ));
 }
 
-/// Called on OnEnter(GameOver).
 pub fn play_game_over_sfx(mut commands: Commands, sfx: Res<SfxHandles>) {
     play_sfx(&mut commands, &sfx.game_over);
 }
 
-/// Called on OnEnter(Victory).
 pub fn play_victory_sfx(mut commands: Commands, sfx: Res<SfxHandles>) {
     play_sfx(&mut commands, &sfx.victory);
 }
 
-/// Event for requesting sound playback from gameplay systems.
 #[derive(Event, Debug)]
 pub enum SfxRequest {
     Shoot,
@@ -148,7 +142,6 @@ pub enum SfxRequest {
     WaveStart,
 }
 
-/// Listens for SfxRequest events and plays matching sounds.
 pub fn handle_sfx_requests(
     mut events: EventReader<SfxRequest>,
     mut commands: Commands,

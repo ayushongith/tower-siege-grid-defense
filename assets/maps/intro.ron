@@ -1,0 +1,8 @@
+(
+    name: "Intro",
+    width: 15,
+    height: 10,
+    grid_path: [
+        (0, 4), (14, 4),
+    ],
+)

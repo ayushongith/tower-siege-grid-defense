@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use crate::components::{BaseMarker, GridPosition, MapDecoration, MapTile, PathWaypointMarker, SpawnMarker};
-use crate::resources::{load_map_by_index, tile_color, GameSettings, Map, TileType};
+use crate::resources::{load_map_by_index, tile_color, GameSettings, LevelManager, Map, TileType};
 use crate::utils::{grid_to_world, TILE_SIZE};
 use crate::AppState;
 
@@ -31,12 +31,13 @@ fn setup_initial_map(mut commands: Commands, settings: Res<GameSettings>) {
 fn respawn_map_visuals(
     mut commands: Commands,
     settings: Res<GameSettings>,
+    level: Res<LevelManager>,
     mut map: ResMut<Map>,
     existing: Query<Entity, Or<(With<MapTile>, With<MapDecoration>, With<SpawnMarker>, With<BaseMarker>, With<PathWaypointMarker>)>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    *map = load_map_by_index(settings.map_index);
+    *map = load_map_by_index(level.map_index());
     map.dirty = true;
 
     for e in &existing {
