@@ -4,7 +4,7 @@ use bevy::window::PrimaryWindow;
 use crate::components::{EnemyType, GridPosition, TowerEditTarget, TowerSelection, TowerType};
 use crate::plugins::enemy_plugin::SpawnEnemyRequest;
 use crate::plugins::tower_plugin::{find_tower_placement, spawn_tower};
-use crate::resources::{GameStats, Map, WaveManager};
+use crate::resources::{GameSpeed, GameStats, Map, WaveManager};
 use crate::utils::world_to_grid;
 use crate::AppState;
 
@@ -47,6 +47,8 @@ fn handle_escape_and_tower_select(
     mut next_state: ResMut<NextState<AppState>>,
     mut tower_sel: ResMut<TowerSelection>,
     mut edit_target: ResMut<TowerEditTarget>,
+    mut speed: ResMut<GameSpeed>,
+    mut time: ResMut<Time<Virtual>>,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
         if tower_sel.selected.is_some() {
@@ -72,6 +74,12 @@ fn handle_escape_and_tower_select(
     if keys.just_pressed(KeyCode::Digit1) || keys.just_pressed(KeyCode::Digit2) || keys.just_pressed(KeyCode::Digit3) {
         tower_sel.selected = None;
         edit_target.entity = None;
+    }
+
+    if keys.just_pressed(KeyCode::KeyG) {
+        speed.toggle();
+        time.set_relative_speed(speed.multiplier);
+        info!("Game speed: {}", speed.label);
     }
 }
 

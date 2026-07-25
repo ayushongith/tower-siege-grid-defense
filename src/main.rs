@@ -26,7 +26,7 @@ use plugins::{
     wave_plugin::WaveAnnouncement, CameraPlugin, EnemyPlugin, InputPlugin, MapPlugin,
     ProjectilePlugin, StatusPlugin, TowerPlugin, UiPlugin, VisualPlugin, WavePlugin,
 };
-use resources::{AudioSettings, GameStats, LevelManager, WaveManager};
+use resources::{AudioSettings, GameSpeed, GameStats, LevelManager, WaveManager};
 
 // ---------------------------------------------------------------------------
 // Application states
@@ -73,6 +73,7 @@ fn main() {
         .init_resource::<WaveManager>()
         .init_resource::<AudioSettings>()
         .init_resource::<LevelManager>()
+        .init_resource::<GameSpeed>()
         // --- States ----------------------------------------------------------
         .init_state::<AppState>()
         // --- Domain plugins --------------------------------------------------

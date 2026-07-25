@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::components::{Tower, TowerEditTarget, TowerLevel, TowerSelection, TowerType};
 use crate::plugins::tower_plugin;
-use crate::resources::{GameStats, LevelManager, Map, TileType, WaveManager};
+use crate::resources::{GameSpeed, GameStats, LevelManager, Map, TileType, WaveManager};
 use crate::AppState;
 
 pub struct UiPlugin;
@@ -281,14 +281,15 @@ fn update_stats_panel(
     stats: Res<GameStats>,
     waves: Res<WaveManager>,
     level: Res<LevelManager>,
+    speed: Res<GameSpeed>,
     mut query: Query<&mut Text, With<StatsPanel>>,
 ) {
     for mut text in &mut query {
         text.0 = format!(
-            "Gold: {}  Lives: {}  Lv{}  Wave: {}/{}  Kills: {}  Earned: {}g",
+            "Gold: {}  Lives: {}  Lv{}  Wave: {}/{}  Kills: {}  {}  Earned: {}g",
             stats.gold, stats.lives, level.current_level,
             waves.current_wave, waves.campaign_victory_wave, stats.kills,
-            stats.gold_earned,
+            speed.label, stats.gold_earned,
         );
     }
 }

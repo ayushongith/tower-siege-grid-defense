@@ -451,6 +451,34 @@ impl WaveManager {
 }
 
 // ---------------------------------------------------------------------------
+// Game speed
+// ---------------------------------------------------------------------------
+
+#[derive(Resource, Debug, Clone)]
+pub struct GameSpeed {
+    pub multiplier: f32,
+    pub label: &'static str,
+}
+
+impl Default for GameSpeed {
+    fn default() -> Self {
+        Self { multiplier: 1.0, label: "1x" }
+    }
+}
+
+impl GameSpeed {
+    pub fn toggle(&mut self) {
+        if self.multiplier == 1.0 {
+            self.multiplier = 2.0;
+            self.label = "2x";
+        } else {
+            self.multiplier = 1.0;
+            self.label = "1x";
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Audio settings
 // ---------------------------------------------------------------------------
 
