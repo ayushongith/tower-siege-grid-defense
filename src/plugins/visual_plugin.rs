@@ -1,18 +1,19 @@
 use bevy::prelude::*;
 
-use crate::components::{ChainLightningFx, Health, HealthBar, HitEffect, PathFollower};
+use crate::components::{ChainLightningFx, DamageFlash, Health, HealthBar, HitEffect, PathFollower};
 use crate::AppState;
 
 pub struct VisualPlugin;
 
 impl Plugin for VisualPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app        .add_systems(
             Update,
             (
                 update_health_bars,
                 update_hit_effects,
                 update_chain_fx,
+                update_damage_flash,
             )
                 .run_if(in_state(AppState::Playing)),
         );
@@ -59,6 +60,26 @@ fn update_hit_effects(
         transform.scale = Vec3::splat(1.0 + 0.5 * frac);
         if let Some(m) = materials.get_mut(&mat.0) {
             m.color.set_alpha((1.0 - frac) * 0.9);
+        }
+    }
+}
+
+fn update_damage_flash(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut enemies: Query<(Entity, &Children, &mut DamageFlash), With<PathFollower>>,
+    mut bars: Query<&mut Sprite, With<HealthBar>>,
+) {
+    for (entity, children, mut flash) in &mut enemies {
+        flash.0.tick(time.delta());
+        if flash.0.finished() {
+            commands.entity(entity).remove::<DamageFlash>();
+        } else {
+            for &child in children.iter() {
+                if let Ok(mut sprite) = bars.get_mut(child) {
+                    sprite.color = Color::srgb(1.0, 1.0, 0.6);
+                }
+            }
         }
     }
 }

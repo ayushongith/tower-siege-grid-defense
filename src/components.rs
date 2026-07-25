@@ -394,6 +394,9 @@ pub struct TowerSelection {
 #[derive(Component, Debug)]
 pub struct HealthBar;
 
+#[derive(Component, Debug)]
+pub struct DamageFlash(pub Timer);
+
 #[derive(Component, Debug, Clone)]
 pub struct TowerLevel {
     pub level: u32,

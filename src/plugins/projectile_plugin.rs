@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
 use crate::components::{
-    Armor, ChainLightningFx, Enemy, Health, HitEffect, PathFollower, Position, Projectile,
-    TowerType,
+    Armor, ChainLightningFx, DamageFlash, Enemy, Health, HitEffect, PathFollower, Position,
+    Projectile, TowerType,
 };
 use crate::plugins::status_plugin::{apply_burn, apply_slow};
 use crate::resources::{GameStats, WaveManager};
@@ -131,6 +131,7 @@ fn apply_projectile_damage(
             }
 
             health.current -= dmg;
+            commands.entity(entity).insert(DamageFlash(Timer::from_seconds(0.15, TimerMode::Once)));
             spawn_hit_fx(
                 &mut commands,
                 &mut meshes,
