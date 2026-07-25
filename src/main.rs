@@ -136,7 +136,6 @@ struct GameOverUi;
 struct VictoryUi;
 
 fn setup_menu_ui(mut commands: Commands) {
-    // Root UI node covering the window.
     commands
         .spawn((
             MenuUi,
@@ -146,46 +145,84 @@ fn setup_menu_ui(mut commands: Commands) {
                 flex_direction: FlexDirection::Column,
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                row_gap: Val::Px(12.0),
+                row_gap: Val::Px(8.0),
                 ..default()
             },
             BackgroundColor(Color::srgba(0.05, 0.08, 0.05, 0.82)),
             Name::new("MenuRoot"),
         ))
         .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        width: Val::Px(500.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        padding: UiRect::all(Val::Px(30.0)),
+                        row_gap: Val::Px(8.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.08, 0.12, 0.08, 0.6)),
+                    Name::new("MenuCard"),
+                ))
+                .with_children(|card| {
+                    card.spawn((
+                        Text::new("TOWER SIEGE"),
+                        TextFont { font_size: 52.0, ..default() },
+                        TextColor(Color::srgb(0.95, 0.92, 0.80)),
+                    ));
+                    card.spawn((
+                        Text::new("Grid Defense"),
+                        TextFont { font_size: 26.0, ..default() },
+                        TextColor(Color::srgb(0.70, 0.78, 0.65)),
+                    ));
+                    card.spawn((
+                        Text::new("100 levels · 10 maps · 5 tower types"),
+                        TextFont { font_size: 16.0, ..default() },
+                        TextColor(Color::srgb(0.55, 0.60, 0.55)),
+                    ));
+                });
+
+            parent
+                .spawn((
+                    Node {
+                        width: Val::Px(500.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        padding: UiRect::all(Val::Px(20.0)),
+                        row_gap: Val::Px(4.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.06, 0.08, 0.06, 0.5)),
+                    Name::new("ControlsCard"),
+                ))
+                .with_children(|card| {
+                    card.spawn((
+                        Text::new("Controls"),
+                        TextFont { font_size: 18.0, ..default() },
+                        TextColor(Color::srgb(0.85, 0.80, 0.65)),
+                    ));
+                    card.spawn((
+                        Text::new("Q/W/E/R/T  — Select tower     LMB    — Place / Select"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(Color::srgb(0.65, 0.70, 0.65)),
+                    ));
+                    card.spawn((
+                        Text::new("U / Upgrade btn  — Upgrade     S / Sell btn  — Sell tower"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(Color::srgb(0.65, 0.70, 0.65)),
+                    ));
+                    card.spawn((
+                        Text::new("R  — Show ranges     G  — Toggle speed     ESC  — Pause"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(Color::srgb(0.65, 0.70, 0.65)),
+                    ));
+                });
+
             parent.spawn((
-                Text::new("Tower Siege: Grid Defense"),
-                TextFont {
-                    font_size: 48.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.95, 0.92, 0.80)),
-            ));
-            parent.spawn((
-                Text::new("Day 5 — Release"),
-                TextFont {
-                    font_size: 24.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.70, 0.78, 0.65)),
-            ));
-            parent.spawn((
-                Text::new("Press ENTER or SPACE to start"),
-                TextFont {
-                    font_size: 22.0,
-                    ..default()
-                },
+                Text::new("Press  ENTER  or  SPACE  to start"),
+                TextFont { font_size: 22.0, ..default() },
                 TextColor(Color::srgb(0.85, 0.85, 0.85)),
-            ));
-            parent.spawn((
-                Text::new(
-                    "Q/W/E/R/T select tower · LMB place/click to select · U upgrade · S sell · ESC pause",
-                ),
-                TextFont {
-                    font_size: 16.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.65, 0.70, 0.65)),
             ));
         });
 
