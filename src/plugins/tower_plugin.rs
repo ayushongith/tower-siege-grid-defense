@@ -159,7 +159,7 @@ fn manage_placement_preview(
     windows: Query<&Window, With<PrimaryWindow>>,
     camera_q: Query<(&Camera, &GlobalTransform)>,
     mut range_q: Query<
-        (&mut Transform, &MeshMaterial2d<ColorMaterial>),
+        (&mut Transform, &Mesh2d, &MeshMaterial2d<ColorMaterial>),
         (With<TowerRangePreview>, Without<TowerPlacementGhost>),
     >,
     mut ghost_q: Query<
@@ -168,11 +168,20 @@ fn manage_placement_preview(
     >,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut last_type: Local<Option<TowerType>>,
 ) {
     let Some(tower_type) = tower_sel.selected else {
         despawn_preview(&mut commands, &mut preview);
+        *last_type = None;
         return;
     };
+
+    if *last_type != Some(tower_type) {
+        if let Some(re) = preview.range_entity.take() {
+            commands.entity(re).despawn_recursive();
+        }
+        *last_type = Some(tower_type);
+    }
 
     if preview.range_entity.is_none() {
         let range_entity = commands
@@ -223,9 +232,11 @@ fn manage_placement_preview(
     };
 
     if let Some(re) = preview.range_entity {
-        if let Ok((mut tf, mat)) = range_q.get_mut(re) {
+        if let Ok((mut tf, mesh2d, mat)) = range_q.get_mut(re) {
             tf.translation = world.extend(4.0);
-            tf.scale = Vec3::splat(tower_type.range() / tower_type.range().max(1.0));
+            if let Some(mesh) = meshes.get_mut(&mesh2d.0) {
+                *mesh = Mesh::from(Circle::new(tower_type.range()));
+            }
             if let Some(m) = materials.get_mut(&mat.0) {
                 m.color = range_color;
             }
