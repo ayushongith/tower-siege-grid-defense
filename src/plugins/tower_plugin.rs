@@ -18,12 +18,16 @@ pub struct PlacementPreviewState {
     pub ghost_entity: Option<Entity>,
 }
 
+#[derive(Resource, Debug, Default)]
+pub struct ShowTowerRanges(pub bool);
+
 pub struct TowerPlugin;
 
 impl Plugin for TowerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<TowerEditTarget>()
             .init_resource::<PlacementPreviewState>()
+            .init_resource::<ShowTowerRanges>()
             .add_systems(
                 Update,
                 (
@@ -34,6 +38,8 @@ impl Plugin for TowerPlugin {
                     upgrade_tower_system,
                     sell_tower_system,
                     update_tower_selection_ring,
+                    toggle_tower_ranges,
+                    draw_tower_ranges,
                 )
                     .chain()
                     .run_if(in_state(AppState::Playing)),
@@ -447,6 +453,52 @@ pub fn spawn_tower(
     commands.entity(base).add_child(turret);
 
     true
+}
+
+#[derive(Component)]
+pub struct TowerRangeCircle;
+
+fn toggle_tower_ranges(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut show: ResMut<ShowTowerRanges>,
+    mut range_circles: Query<Entity, With<TowerRangeCircle>>,
+    mut commands: Commands,
+) {
+    if keys.just_pressed(KeyCode::KeyR) {
+        show.0 = !show.0;
+        info!("Tower ranges visible: {}", show.0);
+        if !show.0 {
+            for e in &range_circles {
+                commands.entity(e).despawn_recursive();
+            }
+        }
+    }
+}
+
+fn draw_tower_ranges(
+    show: Res<ShowTowerRanges>,
+    towers: Query<(&Tower, &Transform)>,
+    existing: Query<Entity, With<TowerRangeCircle>>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    if !show.0 { return; }
+
+    for e in &existing {
+        commands.entity(e).despawn_recursive();
+    }
+
+    for (tower, tf) in &towers {
+        commands.spawn((
+            TowerRangeCircle,
+            Mesh2d(meshes.add(Circle::new(tower.range))),
+            MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgba(
+                0.5, 0.8, 0.6, 0.12,
+            )))),
+            Transform::from_xyz(tf.translation.x, tf.translation.y, 3.0),
+        ));
+    }
 }
 
 pub fn find_tower_placement(
