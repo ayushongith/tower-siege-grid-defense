@@ -262,17 +262,43 @@ fn spawn_hit_fx(
     pos: Vec2,
     kill: bool,
 ) {
-    let color = if kill {
-        Color::srgba(1.0, 0.90, 0.30, 0.9)
+    if kill {
+        for i in 0..4 {
+            let offset = Vec2::new(
+                (i as f32 * 1.57).cos() * 12.0,
+                (i as f32 * 1.57).sin() * 12.0,
+            );
+            commands.spawn((
+                HitEffect {
+                    timer: Timer::from_seconds(0.35, TimerMode::Once),
+                },
+                Mesh2d(meshes.add(Circle::new(6.0))),
+                MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgba(
+                    1.0, 0.85, 0.30, 0.9,
+                )))),
+                Transform::from_translation((pos + offset).extend(20.0)),
+            ));
+        }
+        commands.spawn((
+            HitEffect {
+                timer: Timer::from_seconds(0.3, TimerMode::Once),
+            },
+            Mesh2d(meshes.add(Circle::new(14.0))),
+            MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgba(
+                1.0, 0.60, 0.20, 0.7,
+            )))),
+            Transform::from_translation(pos.extend(19.0)),
+        ));
     } else {
-        Color::srgba(1.0, 1.0, 1.0, 0.9)
-    };
-    commands.spawn((
-        HitEffect {
-            timer: Timer::from_seconds(0.2, TimerMode::Once),
-        },
-        Mesh2d(meshes.add(Circle::new(8.0))),
-        MeshMaterial2d(materials.add(ColorMaterial::from_color(color))),
-        Transform::from_translation(pos.extend(20.0)),
-    ));
+        commands.spawn((
+            HitEffect {
+                timer: Timer::from_seconds(0.2, TimerMode::Once),
+            },
+            Mesh2d(meshes.add(Circle::new(8.0))),
+            MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgba(
+                1.0, 1.0, 1.0, 0.9,
+            )))),
+            Transform::from_translation(pos.extend(20.0)),
+        ));
+    }
 }
