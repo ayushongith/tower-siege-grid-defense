@@ -68,6 +68,11 @@ fn handle_escape_and_tower_select(
             info!("Selected {} tower (cost: {})", tower_type.label(), tower_type.cost());
         }
     }
+
+    if keys.just_pressed(KeyCode::Digit1) || keys.just_pressed(KeyCode::Digit2) || keys.just_pressed(KeyCode::Digit3) {
+        tower_sel.selected = None;
+        edit_target.entity = None;
+    }
 }
 
 fn handle_spawn_keys(

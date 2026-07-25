@@ -16,3 +16,6 @@ Thumbs.db
 .env
 .env.*
 *.pem
+
+dist/
+.claude/

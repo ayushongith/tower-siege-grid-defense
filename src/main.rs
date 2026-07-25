@@ -27,7 +27,7 @@ use components::{
 };
 use plugins::{
     wave_plugin::WaveAnnouncement, CameraPlugin, EnemyPlugin, InputPlugin, MapPlugin,
-    ProjectilePlugin, StatusPlugin, TowerPlugin, VisualPlugin, WavePlugin,
+    ProjectilePlugin, StatusPlugin, TowerPlugin, UiPlugin, VisualPlugin, WavePlugin,
 };
 use resources::{AudioSettings, GameStats, LevelManager, WaveManager};
 
@@ -79,7 +79,7 @@ fn main() {
         // --- States ----------------------------------------------------------
         .init_state::<AppState>()
         // --- Domain plugins --------------------------------------------------
-        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, VisualPlugin, WavePlugin, StatusPlugin, CameraPlugin))
+        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, VisualPlugin, WavePlugin, StatusPlugin, CameraPlugin, UiPlugin))
         .add_audio_source::<sfx::SfxSource>()
         // --- Bootstrap systems ----------------------------------------------
         .add_event::<sfx::SfxRequest>()
@@ -189,7 +189,7 @@ fn setup_menu_ui(mut commands: Commands) {
             ));
             parent.spawn((
                 Text::new(
-                    "SPACE/1/2/3 spawn · 4=Arrow 5=Cannon · LMB place/select · U upgrade · S sell · ESC pause",
+                    "Q/W/E/R/T select tower · LMB place/click to select · U upgrade · S sell · ESC pause",
                 ),
                 TextFont {
                     font_size: 16.0,

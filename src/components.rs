@@ -313,11 +313,21 @@ impl TowerType {
 
     pub fn hotkey(self) -> KeyCode {
         match self {
-            TowerType::Arrow => KeyCode::Digit4,
-            TowerType::Cannon => KeyCode::Digit5,
-            TowerType::Slow => KeyCode::Digit6,
-            TowerType::Sniper => KeyCode::Digit7,
-            TowerType::Tesla => KeyCode::Digit8,
+            TowerType::Arrow => KeyCode::KeyQ,
+            TowerType::Cannon => KeyCode::KeyW,
+            TowerType::Slow => KeyCode::KeyE,
+            TowerType::Sniper => KeyCode::KeyR,
+            TowerType::Tesla => KeyCode::KeyT,
+        }
+    }
+
+    pub fn hotkey_char(self) -> &'static str {
+        match self {
+            TowerType::Arrow => "Q",
+            TowerType::Cannon => "W",
+            TowerType::Slow => "E",
+            TowerType::Sniper => "R",
+            TowerType::Tesla => "T",
         }
     }
 }

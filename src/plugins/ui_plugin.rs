@@ -1,137 +1,174 @@
 use bevy::prelude::*;
 
-use crate::components::TowerType;
-use crate::resources::{GameStats, WaveManager};
+use crate::components::{TowerEditTarget, TowerSelection, TowerType};
+use crate::resources::{GameStats, LevelManager, WaveManager};
 use crate::AppState;
 
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_ui).add_systems(
-            Update,
-            (update_stats_panel, update_wave_info_panel, handle_tower_shop_clicks)
-                .run_if(in_state(AppState::Playing)),
-        );
+        app.add_systems(Startup, setup_ui)
+            .add_systems(
+                Update,
+                (update_stats_panel, update_toolbar_buttons).run_if(in_state(AppState::Playing)),
+            )
+            .add_systems(OnEnter(AppState::Playing), show_game_ui)
+            .add_systems(OnExit(AppState::Playing), hide_game_ui);
     }
 }
+
+#[derive(Component)]
+struct GameUiRoot;
+
+#[derive(Component)]
+struct StatsPanel;
 
 #[derive(Component)]
 struct TowerShopButton {
     tower_type: TowerType,
 }
 
-#[derive(Component)]
-struct WaveInfoPanel;
-
-#[derive(Component)]
-struct StatsPanel;
-
 fn setup_ui(mut commands: Commands) {
-    commands.spawn((
-        StatsPanel,
-        Text::new("Gold: 0  Lives: 0"),
-        TextFont { font_size: 18.0, ..default() },
-        TextColor(Color::srgb(0.90, 0.90, 0.90)),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(10.0),
-            left: Val::Px(10.0),
-            ..default()
-        },
-        Name::new("StatsPanel"),
-    ));
-
-    commands.spawn((
-        WaveInfoPanel,
-        Text::new("Wave: 0/10 | Enemies: 0/0"),
-        TextFont { font_size: 16.0, ..default() },
-        TextColor(Color::srgb(0.85, 0.85, 0.65)),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(32.0),
-            left: Val::Px(10.0),
-            ..default()
-        },
-        Name::new("WaveInfoPanel"),
-    ));
-
     commands
         .spawn((
+            GameUiRoot,
+            Visibility::Hidden,
             Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
                 position_type: PositionType::Absolute,
-                right: Val::Px(0.0),
-                top: Val::Px(0.0),
-                bottom: Val::Px(0.0),
-                width: Val::Px(150.0),
-                flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::FlexStart,
-                align_items: AlignItems::Center,
-                padding: UiRect::all(Val::Px(10.0)),
-                row_gap: Val::Px(10.0),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.8)),
-            Name::new("TowerShop"),
+            Name::new("GameUiRoot"),
         ))
         .with_children(|parent| {
             parent.spawn((
-                Text::new("Tower Shop"),
-                TextFont { font_size: 24.0, ..default() },
-                TextColor(Color::WHITE),
+                StatsPanel,
+                Text::new("Gold: 0  Lives: 0  Lv1  Wave: 0/10  Kills: 0"),
+                TextFont { font_size: 18.0, ..default() },
+                TextColor(Color::srgb(0.90, 0.90, 0.90)),
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(10.0),
+                    left: Val::Px(10.0),
+                    ..default()
+                },
+                Name::new("StatsPanel"),
             ));
 
-            for tower_type in TowerType::ALL {
-                parent
-                    .spawn((
-                        TowerShopButton { tower_type },
-                        Button,
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Px(50.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            ..default()
-                        },
-                        BackgroundColor(tower_type.color()),
-                    ))
-                    .with_children(|parent| {
-                        parent.spawn((
-                            Text::new(format!("{} ({})", tower_type.label(), tower_type.cost())),
-                            TextFont { font_size: 16.0, ..default() },
-                            TextColor(Color::BLACK),
-                        ));
-                    });
-            }
+            parent
+                .spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        bottom: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        right: Val::Px(0.0),
+                        height: Val::Px(72.0),
+                        flex_direction: FlexDirection::Row,
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(12.0),
+                        padding: UiRect::new(Val::Px(20.0), Val::Px(20.0), Val::Px(8.0), Val::Px(8.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.08, 0.08, 0.10, 0.90)),
+                    Name::new("BottomToolbar"),
+                ))
+                .with_children(|parent| {
+                    for tt in TowerType::ALL {
+                        parent
+                            .spawn((
+                                TowerShopButton { tower_type: tt },
+                                Button,
+                                Node {
+                                    width: Val::Px(100.0),
+                                    height: Val::Px(56.0),
+                                    flex_direction: FlexDirection::Column,
+                                    justify_content: JustifyContent::Center,
+                                    align_items: AlignItems::Center,
+                                    row_gap: Val::Px(2.0),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgba(0.15, 0.15, 0.20, 0.9)),
+                                Name::new(format!("TowerBtn_{:?}", tt)),
+                            ))
+                            .with_children(|parent| {
+                                parent.spawn((
+                                    Text::new(tt.label()),
+                                    TextFont { font_size: 14.0, ..default() },
+                                    TextColor(tt.color()),
+                                ));
+                                parent.spawn((
+                                    Text::new(format!("{}g", tt.cost())),
+                                    TextFont { font_size: 12.0, ..default() },
+                                    TextColor(Color::srgb(0.90, 0.85, 0.40)),
+                                ));
+                                parent.spawn((
+                                    Text::new(format!("[{}]", tt.hotkey_char())),
+                                    TextFont { font_size: 10.0, ..default() },
+                                    TextColor(Color::srgb(0.50, 0.50, 0.50)),
+                                ));
+                            });
+                    }
+                });
         });
 }
 
-fn update_stats_panel(stats: Res<GameStats>, mut query: Query<&mut Text, With<StatsPanel>>) {
-    for mut text in &mut query {
-        text.0 = format!("Gold: {}  Lives: {}", stats.gold, stats.lives);
+fn show_game_ui(mut query: Query<&mut Visibility, With<GameUiRoot>>) {
+    for mut vis in &mut query {
+        *vis = Visibility::Visible;
     }
 }
 
-fn update_wave_info_panel(waves: Res<WaveManager>, mut query: Query<&mut Text, With<WaveInfoPanel>>) {
+fn hide_game_ui(mut query: Query<&mut Visibility, With<GameUiRoot>>) {
+    for mut vis in &mut query {
+        *vis = Visibility::Hidden;
+    }
+}
+
+fn update_stats_panel(
+    stats: Res<GameStats>,
+    waves: Res<WaveManager>,
+    level: Res<LevelManager>,
+    mut query: Query<&mut Text, With<StatsPanel>>,
+) {
     for mut text in &mut query {
         text.0 = format!(
-            "Wave: {}/{} | Enemies: {}/{}",
-            waves.current_wave,
-            waves.campaign_victory_wave,
-            waves.enemies_spawned,
-            waves.total_enemies
+            "Gold: {}  Lives: {}  Lv{}  Wave: {}/{}  Kills: {}",
+            stats.gold, stats.lives, level.current_level,
+            waves.current_wave, waves.campaign_victory_wave, stats.kills,
         );
     }
 }
 
-fn handle_tower_shop_clicks(
-    mut interactions: Query<(&Interaction, &TowerShopButton), (Changed<Interaction>, With<Button>)>,
-    mut tower_sel: ResMut<crate::components::TowerSelection>,
+fn update_toolbar_buttons(
+    mut tower_sel: ResMut<TowerSelection>,
+    mut edit_target: ResMut<TowerEditTarget>,
+    stats: Res<GameStats>,
+    mut buttons: Query<
+        (&Interaction, &TowerShopButton, &mut BackgroundColor),
+        (Changed<Interaction>, With<Button>),
+    >,
 ) {
-    for (interaction, button) in &mut interactions {
+    for (interaction, btn, mut bg) in &mut buttons {
         if *interaction == Interaction::Pressed {
-            tower_sel.selected = Some(button.tower_type);
-            info!("Selected tower from UI: {:?}", button.tower_type);
+            if tower_sel.selected == Some(btn.tower_type) {
+                tower_sel.selected = None;
+            } else {
+                tower_sel.selected = Some(btn.tower_type);
+                edit_target.entity = None;
+            }
         }
+
+        let is_selected = tower_sel.selected == Some(btn.tower_type);
+        let can_afford = stats.gold >= btn.tower_type.cost();
+        *bg = if is_selected {
+            BackgroundColor(Color::srgba(0.30, 0.70, 0.40, 0.95))
+        } else if can_afford {
+            BackgroundColor(Color::srgba(0.15, 0.15, 0.20, 0.9))
+        } else {
+            BackgroundColor(Color::srgba(0.08, 0.08, 0.10, 0.7))
+        };
     }
 }
