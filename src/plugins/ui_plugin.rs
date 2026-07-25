@@ -285,9 +285,10 @@ fn update_stats_panel(
 ) {
     for mut text in &mut query {
         text.0 = format!(
-            "Gold: {}  Lives: {}  Lv{}  Wave: {}/{}  Kills: {}",
+            "Gold: {}  Lives: {}  Lv{}  Wave: {}/{}  Kills: {}  Earned: {}g",
             stats.gold, stats.lives, level.current_level,
             waves.current_wave, waves.campaign_victory_wave, stats.kills,
+            stats.gold_earned,
         );
     }
 }

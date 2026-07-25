@@ -151,6 +151,7 @@ fn apply_projectile_damage(
 
             if health.current <= 0.0 {
                 stats.gold += enemy.gold_value;
+                stats.gold_earned += enemy.gold_value;
                 stats.kills += 1;
                 waves.enemies_alive = waves.enemies_alive.saturating_sub(1);
                 sfx.send(SfxRequest::Kill);

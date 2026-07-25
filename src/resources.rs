@@ -96,6 +96,7 @@ pub struct GameStats {
     pub lives: u32,
     pub kills: u32,
     pub towers_built: u32,
+    pub gold_earned: u32,
 }
 
 impl Default for GameStats {
@@ -105,6 +106,7 @@ impl Default for GameStats {
             lives: 20,
             kills: 0,
             towers_built: 0,
+            gold_earned: 0,
         }
     }
 }
