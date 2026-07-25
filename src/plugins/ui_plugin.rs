@@ -16,6 +16,7 @@ impl Plugin for UiPlugin {
                     update_stats_panel,
                     update_toolbar_buttons,
                     update_tower_info_panel,
+                    update_wave_progress,
                     handle_ui_upgrade_sell,
                 )
                     .run_if(in_state(AppState::Playing)),
@@ -50,6 +51,15 @@ struct UpgradeBtn;
 
 #[derive(Component)]
 struct SellBtn;
+
+#[derive(Component)]
+struct WaveProgressBar;
+
+#[derive(Component)]
+struct WaveProgressFill;
+
+#[derive(Component)]
+struct WaveProgressText;
 
 fn setup_ui(mut commands: Commands) {
     commands
@@ -153,6 +163,48 @@ fn setup_ui(mut commands: Commands) {
                                 TextColor(Color::WHITE),
                             ));
                         });
+                });
+
+            parent.spawn((
+                WaveProgressText,
+                Text::new("Wave 0/0 | Remaining: 0"),
+                TextFont { font_size: 14.0, ..default() },
+                TextColor(Color::srgb(0.85, 0.85, 0.65)),
+                Node {
+                    position_type: PositionType::Absolute,
+                    bottom: Val::Px(90.0),
+                    left: Val::Percent(20.0),
+                    width: Val::Percent(60.0),
+                    ..default()
+                },
+                Name::new("WaveProgressText"),
+            ));
+
+            parent
+                .spawn((
+                    WaveProgressBar,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        bottom: Val::Px(80.0),
+                        left: Val::Percent(20.0),
+                        width: Val::Percent(60.0),
+                        height: Val::Px(8.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.2, 0.2, 0.2, 0.6)),
+                    Name::new("WaveProgressBar"),
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        WaveProgressFill,
+                        Node {
+                            width: Val::Percent(0.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.30, 0.85, 0.40)),
+                        Name::new("WaveProgressFill"),
+                    ));
                 });
 
             parent
@@ -291,6 +343,33 @@ fn update_tower_info_panel(
 
     for mut vis in &mut panel {
         *vis = Visibility::Hidden;
+    }
+}
+
+fn update_wave_progress(
+    waves: Res<WaveManager>,
+    level: Res<LevelManager>,
+    mut fill: Query<&mut Node, With<WaveProgressFill>>,
+    mut text: Query<&mut Text, With<WaveProgressText>>,
+) {
+    let target = level.target_wave();
+    let progress = if target > 0 {
+        (waves.current_wave as f32 / target as f32).min(1.0)
+    } else {
+        0.0
+    };
+
+    for mut node in &mut fill {
+        node.width = Val::Percent(progress * 100.0);
+    }
+
+    let remaining = if waves.total_enemies > 0 {
+        waves.total_enemies.saturating_sub(waves.enemies_spawned) + waves.enemies_alive
+    } else {
+        0
+    };
+    for mut t in &mut text {
+        t.0 = format!("Wave {}/{} | Remaining: {}", waves.current_wave, target, remaining);
     }
 }
 

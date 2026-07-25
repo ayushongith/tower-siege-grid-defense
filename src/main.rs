@@ -21,10 +21,7 @@ mod utils;
 use bevy::audio::AddAudioSource;
 use bevy::prelude::*;
 
-use components::{
-    HitEffect, MainGameCamera, PathFollower, Projectile, SelectionRing, Tower, TowerEditTarget,
-    TowerLevel, TowerSelection,
-};
+use components::{HitEffect, MainGameCamera, PathFollower, Projectile, SelectionRing, Tower};
 use plugins::{
     wave_plugin::WaveAnnouncement, CameraPlugin, EnemyPlugin, InputPlugin, MapPlugin,
     ProjectilePlugin, StatusPlugin, TowerPlugin, UiPlugin, VisualPlugin, WavePlugin,
@@ -97,8 +94,6 @@ fn main() {
         .add_systems(
             Update,
             (
-                update_hud,
-                update_wave_announcement,
                 detect_game_over,
                 detect_victory,
                 sfx::handle_sfx_requests,
@@ -132,12 +127,6 @@ struct PauseBanner;
 
 #[derive(Component)]
 struct MuteMusicButton;
-
-#[derive(Component)]
-struct HudText;
-
-#[derive(Component)]
-struct WaveAnnouncementText;
 
 #[derive(Component)]
 struct GameOverUi;
@@ -198,43 +187,6 @@ fn setup_menu_ui(mut commands: Commands) {
                 TextColor(Color::srgb(0.65, 0.70, 0.65)),
             ));
         });
-
-    // HUD (hidden until Playing via text content updates; always present).
-    commands.spawn((
-        HudText,
-        Text::new(""),
-        TextFont {
-            font_size: 18.0,
-            ..default()
-        },
-        TextColor(Color::srgb(0.90, 0.90, 0.90)),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(12.0),
-            left: Val::Px(16.0),
-            ..default()
-        },
-        Visibility::Hidden,
-        Name::new("HudText"),
-    ));
-
-    // Wave announcement (shown briefly at wave start/complete).
-    commands.spawn((
-        WaveAnnouncementText,
-        Text::new(""),
-        TextFont {
-            font_size: 36.0,
-            ..default()
-        },
-        TextColor(Color::srgb(1.0, 0.90, 0.40)),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(80.0),
-            left: Val::Percent(50.0),
-            ..default()
-        },
-        Name::new("WaveAnnouncement"),
-    ));
 
     // Pause banner (toggled on pause enter/exit).
     commands
@@ -317,58 +269,6 @@ fn handle_mute_button(
             settings.music_enabled = !settings.music_enabled;
             info!("Toggled music enabled to: {}", settings.music_enabled);
         }
-    }
-}
-
-fn update_hud(
-    stats: Res<GameStats>,
-    waves: Res<WaveManager>,
-    level: Res<LevelManager>,
-    tower_sel: Res<TowerSelection>,
-    edit_target: Res<TowerEditTarget>,
-    towers: Query<(&Tower, &TowerLevel)>,
-    mut hud: Query<(&mut Text, &mut Visibility), With<HudText>>,
-) {
-    for (mut text, mut vis) in &mut hud {
-        *vis = Visibility::Visible;
-        let mut hints = String::new();
-
-        if let Some(t) = tower_sel.selected {
-            hints.push_str(&format!(" [placing {:?} tower - click buildable tile]", t));
-        } else if let Some(entity) = edit_target.entity {
-            if let Ok((tower, tower_lv)) = towers.get(entity) {
-                hints.push_str(&format!(
-                    " [select {:?} Lv{} - U upgrade({}g) | S sell({}g)]",
-                    tower.tower_type,
-                    tower_lv.level,
-                    crate::plugins::tower_plugin::upgrade_cost(tower_lv.level, tower.tower_type.cost()),
-                    (tower_lv.total_invested as f32 * 0.5).round() as u32,
-                ));
-            }
-        }
-
-        let wave_info = if waves.total_enemies > 0 {
-            format!(
-                "Enemies: {}/{}",
-                (waves.spawn_index as u32).min(waves.total_enemies),
-                waves.total_enemies
-            )
-        } else {
-            "Enemies: 0".to_string()
-        };
-        *text = Text::new(format!(
-            "Lv{}  Gold: {}  Lives: {}  Wave: {}  {}  Spawned: {}{}",
-            level.current_level, stats.gold, stats.lives, waves.current_wave, wave_info, waves.enemies_spawned, hints
-        ));
-    }
-}
-
-fn update_wave_announcement(
-    ann: Res<WaveAnnouncement>,
-    mut query: Query<&mut Text, With<WaveAnnouncementText>>,
-) {
-    for mut text in &mut query {
-        text.0 = ann.text.clone();
     }
 }
 
