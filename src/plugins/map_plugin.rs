@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use crate::components::{BaseMarker, GridPosition, MapDecoration, MapTile, PathWaypointMarker, SpawnMarker};
-use crate::resources::{load_map_by_index, tile_color, GameSettings, LevelManager, Map, TileType};
+use crate::resources::{tile_color, tile_texture, texture_loaded, load_map_by_index, GameSettings, LevelManager, Map, TileType, TextureManager};
 use crate::utils::{grid_to_world, TILE_SIZE};
 use crate::AppState;
 
@@ -30,8 +30,8 @@ fn setup_initial_map(mut commands: Commands, settings: Res<GameSettings>) {
 /// Rebuild map visuals when entering Playing (handles restart / map change).
 fn respawn_map_visuals(
     mut commands: Commands,
-    settings: Res<GameSettings>,
     level: Res<LevelManager>,
+    textures: Res<TextureManager>,
     mut map: ResMut<Map>,
     existing: Query<Entity, Or<(With<MapTile>, With<MapDecoration>, With<SpawnMarker>, With<BaseMarker>, With<PathWaypointMarker>)>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -44,7 +44,7 @@ fn respawn_map_visuals(
         commands.entity(e).despawn_recursive();
     }
 
-    spawn_map_visuals(&mut commands, &map, &mut meshes, &mut materials);
+    spawn_map_visuals(&mut commands, &map, &mut meshes, &mut materials, &textures);
 }
 
 pub fn spawn_map_visuals(
@@ -52,6 +52,7 @@ pub fn spawn_map_visuals(
     map: &Map,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<ColorMaterial>>,
+    textures: &Res<TextureManager>,
 ) {
     let tile_visual = TILE_SIZE - 2.0;
 
@@ -59,15 +60,22 @@ pub fn spawn_map_visuals(
         for col in 0..map.width {
             let tile = map.get_tile(col, row).expect("in-range");
             let world = grid_to_world(col, row, map.width, map.height);
+            let texture = tile_texture(textures, tile);
+            let is_texture_valid = texture_loaded(&texture);
+
+            let mut sprite = Sprite {
+                color: tile_color(tile),
+                custom_size: Some(Vec2::splat(tile_visual)),
+                ..default()
+            };
+            if is_texture_valid {
+                sprite.image = texture;
+            }
 
             commands.spawn((
                 MapTile,
                 GridPosition { col, row },
-                Sprite {
-                    color: tile_color(tile),
-                    custom_size: Some(Vec2::splat(tile_visual)),
-                    ..default()
-                },
+                sprite,
                 Transform::from_translation(world.extend(0.0)),
                 Name::new(format!("Tile_{col}_{row}")),
             ));
@@ -135,6 +143,7 @@ pub fn spawn_map_visuals(
 fn sync_tile_visuals(
     mut map: ResMut<Map>,
     mut tiles: Query<(&GridPosition, &mut Sprite), With<MapTile>>,
+    textures: Res<TextureManager>,
 ) {
     if !map.dirty {
         return;
@@ -143,6 +152,10 @@ fn sync_tile_visuals(
 
     for (grid, mut sprite) in &mut tiles {
         if let Some(tile) = map.get_tile(grid.col, grid.row) {
+            let texture = tile_texture(&textures, tile);
+            if texture_loaded(&texture) {
+                sprite.image = texture;
+            }
             sprite.color = tile_color(tile);
         }
     }

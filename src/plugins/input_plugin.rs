@@ -4,7 +4,7 @@ use bevy::window::PrimaryWindow;
 use crate::components::{EnemyType, GridPosition, TowerEditTarget, TowerSelection, TowerType};
 use crate::plugins::enemy_plugin::SpawnEnemyRequest;
 use crate::plugins::tower_plugin::{find_tower_placement, spawn_tower};
-use crate::resources::{GameSpeed, GameStats, Map, WaveManager};
+use crate::resources::{GameSpeed, GameStats, Map, TextureManager, WaveManager};
 use crate::utils::world_to_grid;
 use crate::AppState;
 
@@ -120,6 +120,7 @@ fn handle_mouse_playing(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    textures: Res<TextureManager>,
     mut map: ResMut<Map>,
     mut stats: ResMut<GameStats>,
     mut edit_target: ResMut<TowerEditTarget>,
@@ -140,6 +141,7 @@ fn handle_mouse_playing(
                 &mut commands,
                 &mut meshes,
                 &mut materials,
+                &textures,
                 &mut map,
                 &mut stats,
                 col,

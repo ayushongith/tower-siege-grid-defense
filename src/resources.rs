@@ -479,6 +479,144 @@ impl GameSpeed {
 }
 
 // ---------------------------------------------------------------------------
+// Texture management
+// ---------------------------------------------------------------------------
+
+#[derive(Resource, Debug)]
+pub struct TextureManager {
+    pub tiles: TileTextures,
+    pub enemies: EnemyTextures,
+    pub towers: TowerTextures,
+    pub projectiles: ProjectileTextures,
+}
+
+#[derive(Debug)]
+pub struct TileTextures {
+    pub buildable: Handle<Image>,
+    pub path: Handle<Image>,
+    pub occupied: Handle<Image>,
+    pub spawn: Handle<Image>,
+    pub base: Handle<Image>,
+}
+
+#[derive(Debug)]
+pub struct EnemyTextures {
+    pub normal: Handle<Image>,
+    pub fast: Handle<Image>,
+    pub tank: Handle<Image>,
+    pub armored: Handle<Image>,
+    pub swarm: Handle<Image>,
+    pub boss: Handle<Image>,
+}
+
+#[derive(Debug)]
+pub struct TowerTextures {
+    pub arrow: Handle<Image>,
+    pub cannon: Handle<Image>,
+    pub slow: Handle<Image>,
+    pub sniper: Handle<Image>,
+    pub tesla: Handle<Image>,
+}
+
+#[derive(Debug)]
+pub struct ProjectileTextures {
+    pub arrow: Handle<Image>,
+    pub cannon: Handle<Image>,
+    pub slow: Handle<Image>,
+    pub sniper: Handle<Image>,
+    pub tesla: Handle<Image>,
+}
+
+impl TextureManager {
+    pub fn load(asset_server: &AssetServer) -> Self {
+        fn load_if_exists(server: &AssetServer, path: &str) -> Handle<Image> {
+            if std::path::Path::new("assets").join(path).exists() {
+                server.load(path)
+            } else {
+                Handle::default()
+            }
+        }
+
+        Self {
+            tiles: TileTextures {
+                buildable: load_if_exists(asset_server, "textures/tiles/buildable.png"),
+                path: load_if_exists(asset_server, "textures/tiles/path.png"),
+                occupied: load_if_exists(asset_server, "textures/tiles/occupied.png"),
+                spawn: load_if_exists(asset_server, "textures/tiles/spawn.png"),
+                base: load_if_exists(asset_server, "textures/tiles/base.png"),
+            },
+            enemies: EnemyTextures {
+                normal: load_if_exists(asset_server, "textures/enemies/normal.png"),
+                fast: load_if_exists(asset_server, "textures/enemies/fast.png"),
+                tank: load_if_exists(asset_server, "textures/enemies/tank.png"),
+                armored: load_if_exists(asset_server, "textures/enemies/armored.png"),
+                swarm: load_if_exists(asset_server, "textures/enemies/swarm.png"),
+                boss: load_if_exists(asset_server, "textures/enemies/boss.png"),
+            },
+            towers: TowerTextures {
+                arrow: load_if_exists(asset_server, "textures/towers/arrow.png"),
+                cannon: load_if_exists(asset_server, "textures/towers/cannon.png"),
+                slow: load_if_exists(asset_server, "textures/towers/slow.png"),
+                sniper: load_if_exists(asset_server, "textures/towers/sniper.png"),
+                tesla: load_if_exists(asset_server, "textures/towers/tesla.png"),
+            },
+            projectiles: ProjectileTextures {
+                arrow: load_if_exists(asset_server, "textures/projectiles/arrow.png"),
+                cannon: load_if_exists(asset_server, "textures/projectiles/cannon.png"),
+                slow: load_if_exists(asset_server, "textures/projectiles/slow.png"),
+                sniper: load_if_exists(asset_server, "textures/projectiles/sniper.png"),
+                tesla: load_if_exists(asset_server, "textures/projectiles/tesla.png"),
+            },
+        }
+    }
+}
+
+pub fn texture_loaded(handle: &Handle<Image>) -> bool {
+    handle.id() != bevy::asset::AssetId::<Image>::default()
+}
+
+pub fn tile_texture(manager: &TextureManager, tile: TileType) -> Handle<Image> {
+    match tile {
+        TileType::Buildable => manager.tiles.buildable.clone(),
+        TileType::Path => manager.tiles.path.clone(),
+        TileType::Occupied => manager.tiles.occupied.clone(),
+        TileType::Spawn => manager.tiles.spawn.clone(),
+        TileType::Base => manager.tiles.base.clone(),
+    }
+}
+
+pub fn enemy_texture(manager: &TextureManager, enemy: EnemyType) -> Handle<Image> {
+    match enemy {
+        EnemyType::Normal => manager.enemies.normal.clone(),
+        EnemyType::Fast => manager.enemies.fast.clone(),
+        EnemyType::Tank => manager.enemies.tank.clone(),
+        EnemyType::Armored => manager.enemies.armored.clone(),
+        EnemyType::Swarm => manager.enemies.swarm.clone(),
+        EnemyType::Boss => manager.enemies.boss.clone(),
+    }
+}
+
+pub fn tower_texture(manager: &TextureManager, tower: TowerType) -> Handle<Image> {
+    match tower {
+        TowerType::Arrow => manager.towers.arrow.clone(),
+        TowerType::Cannon => manager.towers.cannon.clone(),
+        TowerType::Slow => manager.towers.slow.clone(),
+        TowerType::Sniper => manager.towers.sniper.clone(),
+        TowerType::Tesla => manager.towers.tesla.clone(),
+    }
+}
+
+pub fn projectile_texture(manager: &TextureManager, tower: TowerType) -> Handle<Image> {
+    match tower {
+        TowerType::Arrow => manager.projectiles.arrow.clone(),
+        TowerType::Cannon => manager.projectiles.cannon.clone(),
+        TowerType::Slow => manager.projectiles.slow.clone(),
+        TowerType::Sniper => manager.projectiles.sniper.clone(),
+        TowerType::Tesla => manager.projectiles.tesla.clone(),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Audio settings
 // ---------------------------------------------------------------------------
 

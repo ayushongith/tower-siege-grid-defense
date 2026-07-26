@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 use crate::components::{Armor, Enemy, EnemyType, Health, HealthBar, PathFollower, Position, StunDebuff};
 use crate::plugins::status_plugin::is_stunned;
-use crate::resources::{GameSettings, GameStats, LevelManager, Map, WaveManager, WaveModifier};
+use crate::resources::{enemy_texture, texture_loaded, GameStats, LevelManager, Map, TextureManager, WaveManager, WaveModifier};
 use crate::AppState;
 
 #[derive(Resource, Debug, Default)]
@@ -37,6 +37,7 @@ fn fulfill_spawn_requests(
     waves: Res<WaveManager>,
     level: Res<LevelManager>,
     map: Res<Map>,
+    textures: Res<TextureManager>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
@@ -58,31 +59,6 @@ fn fulfill_spawn_requests(
     let speed_mult = level.speed_mult()
         * if waves.modifier == WaveModifier::Fast { 1.35 } else { 1.0 };
 
-    let body_mesh: Mesh = if enemy_type.sides() > 0 {
-        Mesh::from(RegularPolygon {
-            circumcircle: Circle::new(radius),
-            sides: enemy_type.sides(),
-        })
-    } else {
-        Mesh::from(Circle::new(radius))
-    };
-    let outline_mesh: Mesh = if enemy_type.sides() > 0 {
-        Mesh::from(RegularPolygon {
-            circumcircle: Circle::new(radius + 3.0),
-            sides: enemy_type.sides(),
-        })
-    } else {
-        Mesh::from(Circle::new(radius + 3.0))
-    };
-
-    let outline = commands
-        .spawn((
-            Mesh2d(meshes.add(outline_mesh)),
-            MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.05, 0.05, 0.05)))),
-            Transform::from_translation(Vec3::new(0.0, 0.0, -0.1)),
-        ))
-        .id();
-
     let mut bonus_gold = (waves.current_wave.saturating_sub(1)) * 2;
     if waves.modifier == WaveModifier::BonusGold {
         bonus_gold += 5;
@@ -97,23 +73,73 @@ fn fulfill_spawn_requests(
         _ => Quat::IDENTITY,
     };
 
-    let body = commands
-        .spawn((
-            Mesh2d(meshes.add(body_mesh)),
-            MeshMaterial2d(materials.add(ColorMaterial::from_color(color))),
-            Transform::from_translation(start.extend(10.0)).with_rotation(rotation),
-            Position(start),
-            Health::full(enemy_type.base_health() * wave_scale * hp_mult),
-            Armor {
-                reduction: enemy_type.armor_reduction(),
-            },
-            enemy,
-            PathFollower,
-            Name::new(format!("Enemy_{enemy_type:?}")),
-        ))
-        .id();
+    let enemy_texture_handle = enemy_texture(&textures, enemy_type);
+    let use_texture = texture_loaded(&enemy_texture_handle);
 
-    commands.entity(body).add_children(&[outline]);
+    let body = if use_texture {
+        commands
+            .spawn((
+                Sprite {
+                    image: enemy_texture_handle,
+                    custom_size: Some(Vec2::splat(radius * 2.0)),
+                    ..default()
+                },
+                Transform::from_translation(start.extend(10.0)).with_rotation(rotation),
+                Position(start),
+                Health::full(enemy_type.base_health() * wave_scale * hp_mult),
+                Armor {
+                    reduction: enemy_type.armor_reduction(),
+                },
+                enemy,
+                PathFollower,
+                Name::new(format!("Enemy_{enemy_type:?}")),
+            ))
+            .id()
+    } else {
+        let body_mesh: Mesh = if enemy_type.sides() > 0 {
+            Mesh::from(RegularPolygon {
+                circumcircle: Circle::new(radius),
+                sides: enemy_type.sides(),
+            })
+        } else {
+            Mesh::from(Circle::new(radius))
+        };
+        let outline_mesh: Mesh = if enemy_type.sides() > 0 {
+            Mesh::from(RegularPolygon {
+                circumcircle: Circle::new(radius + 3.0),
+                sides: enemy_type.sides(),
+            })
+        } else {
+            Mesh::from(Circle::new(radius + 3.0))
+        };
+
+        let outline = commands
+            .spawn((
+                Mesh2d(meshes.add(outline_mesh)),
+                MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.05, 0.05, 0.05)))),
+                Transform::from_translation(Vec3::new(0.0, 0.0, -0.1)),
+            ))
+            .id();
+
+        let body = commands
+            .spawn((
+                Mesh2d(meshes.add(body_mesh)),
+                MeshMaterial2d(materials.add(ColorMaterial::from_color(color))),
+                Transform::from_translation(start.extend(10.0)).with_rotation(rotation),
+                Position(start),
+                Health::full(enemy_type.base_health() * wave_scale * hp_mult),
+                Armor {
+                    reduction: enemy_type.armor_reduction(),
+                },
+                enemy,
+                PathFollower,
+                Name::new(format!("Enemy_{enemy_type:?}")),
+            ))
+            .id();
+
+        commands.entity(body).add_children(&[outline]);
+        body
+    };
 
     let bar_y = radius + 10.0;
     let health_bar = commands

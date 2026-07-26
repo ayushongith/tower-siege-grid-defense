@@ -7,7 +7,7 @@ use crate::components::{
     TowerEditTarget, TowerLevel, TowerPlacementGhost, TowerRangePreview, TowerSelection,
     TowerTurret, TowerType,
 };
-use crate::resources::{GameStats, Map, TileType};
+use crate::resources::{projectile_texture, texture_loaded, tower_texture, GameStats, Map, TextureManager, TileType};
 use crate::sfx::SfxRequest;
 use crate::utils::{grid_to_world, world_to_grid, TILE_SIZE};
 use crate::AppState;
@@ -101,6 +101,7 @@ fn tower_shooting(
     time: Res<Time>,
     mut towers: Query<(Entity, &mut Tower, &Transform)>,
     enemies: Query<&Transform, With<PathFollower>>,
+    textures: Res<TextureManager>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut sfx: EventWriter<SfxRequest>,
@@ -135,7 +136,10 @@ fn tower_shooting(
             TowerType::Tesla => (6.0, Color::srgb(0.50, 0.95, 1.0)),
         };
 
-        commands.spawn((
+        let proj_texture_handle = projectile_texture(&textures, tower.tower_type);
+        let use_proj_texture = texture_loaded(&proj_texture_handle);
+
+        let mut entity_cmd = commands.spawn((
             Projectile {
                 target: Some(target),
                 speed: if tower.tower_type == TowerType::Sniper { 500.0 } else { 300.0 },
@@ -146,12 +150,23 @@ fn tower_shooting(
                 tower_type: tower.tower_type,
                 source_tower: Some(tower_entity),
             },
-            Mesh2d(meshes.add(Circle::new(proj_radius))),
-            MeshMaterial2d(materials.add(ColorMaterial::from_color(proj_color))),
             Transform::from_translation(proj_start.extend(15.0)),
             Position(proj_start),
             Name::new(format!("Projectile_{:?}", tower.tower_type)),
         ));
+
+        if use_proj_texture {
+            entity_cmd.insert(Sprite {
+                image: proj_texture_handle,
+                custom_size: Some(Vec2::splat(proj_radius * 2.0)),
+                ..default()
+            });
+        } else {
+            entity_cmd.insert((
+                Mesh2d(meshes.add(Circle::new(proj_radius))),
+                MeshMaterial2d(materials.add(ColorMaterial::from_color(proj_color))),
+            ));
+        }
         sfx.send(SfxRequest::Shoot);
     }
 }
@@ -368,6 +383,7 @@ pub fn spawn_tower(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<ColorMaterial>>,
+    textures: &Res<TextureManager>,
     map: &mut Map,
     stats: &mut GameStats,
     col: usize,
@@ -387,6 +403,9 @@ pub fn spawn_tower(
 
     let world = grid_to_world(col, row, map.width, map.height);
 
+    let tower_texture_handle = tower_texture(textures, tower_type);
+    let use_tower_texture = texture_loaded(&tower_texture_handle);
+
     let base = commands
         .spawn((
             Tower::new(tower_type),
@@ -394,6 +413,7 @@ pub fn spawn_tower(
             GridPosition { col, row },
             Sprite {
                 color: tower_type.color(),
+                image: if use_tower_texture { tower_texture_handle } else { default() },
                 custom_size: Some(Vec2::splat(TILE_SIZE - 4.0)),
                 ..default()
             },

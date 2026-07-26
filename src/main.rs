@@ -26,7 +26,7 @@ use plugins::{
     wave_plugin::WaveAnnouncement, CameraPlugin, EnemyPlugin, InputPlugin, MapPlugin,
     ProjectilePlugin, StatusPlugin, TowerPlugin, UiPlugin, VisualPlugin, WavePlugin,
 };
-use resources::{AudioSettings, GameSpeed, GameStats, LevelManager, WaveManager};
+use resources::{AudioSettings, GameSpeed, GameStats, LevelManager, TextureManager, WaveManager};
 
 // ---------------------------------------------------------------------------
 // Application states
@@ -81,7 +81,7 @@ fn main() {
         .add_audio_source::<sfx::SfxSource>()
         // --- Bootstrap systems ----------------------------------------------
         .add_event::<sfx::SfxRequest>()
-        .add_systems(Startup, (setup_camera, setup_menu_ui, setup_game_over_ui, setup_victory_ui, sfx::setup_sfx))
+        .add_systems(Startup, (setup_camera, setup_menu_ui, setup_game_over_ui, setup_victory_ui, sfx::setup_sfx, load_textures))
         .add_systems(OnEnter(AppState::Playing), hide_menu_ui)
         .add_systems(OnEnter(AppState::MainMenu), show_menu_ui)
         .add_systems(OnEnter(AppState::Paused), show_paused_banner)
@@ -107,6 +107,11 @@ fn main() {
 // ---------------------------------------------------------------------------
 // Startup
 // ---------------------------------------------------------------------------
+
+/// Load all texture assets at startup.
+fn load_textures(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(TextureManager::load(&asset_server));
+}
 
 /// Fixed orthographic camera centered on the map origin.
 /// 15×10 tiles × 64px ≈ 960×640; 1280×720 leaves comfortable padding.
