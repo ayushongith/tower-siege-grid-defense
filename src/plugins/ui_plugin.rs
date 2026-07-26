@@ -299,20 +299,22 @@ fn update_tower_info_panel(
     towers: Query<(&Tower, &TowerLevel)>,
     stats: Res<GameStats>,
     mut panel: Query<&mut Visibility, With<TowerInfoPanel>>,
-    mut title: Query<&mut Text, (With<TowerInfoTitle>, Without<TowerInfoStats>)>,
-    mut info_text: Query<&mut Text, (With<TowerInfoStats>, Without<TowerInfoTitle>)>,
-    mut upgrade_btn: Query<&mut BackgroundColor, (With<UpgradeBtn>, Without<SellBtn>)>,
-    mut upgrade_label: Query<&mut Text, (With<UpgradeBtn>, Without<SellBtn>)>,
+    mut upgrade_node: Query<(&mut BackgroundColor, &Children), (With<UpgradeBtn>, Without<SellBtn>)>,
+    mut text_set: ParamSet<(
+        Query<&mut Text, (With<TowerInfoTitle>, Without<TowerInfoStats>)>,
+        Query<&mut Text, (With<TowerInfoStats>, Without<TowerInfoTitle>)>,
+        Query<&mut Text>,
+    )>,
 ) {
     if let Some(entity) = edit_target.entity {
         if let Ok((tower, tower_lv)) = towers.get(entity) {
             for mut vis in &mut panel {
                 *vis = Visibility::Visible;
             }
-            for mut t in &mut title {
+            for mut t in &mut text_set.p0() {
                 t.0 = format!("{:?} Tower Lv{}/{}", tower.tower_type, tower_lv.level, tower_lv.max_level);
             }
-            for mut t in &mut info_text {
+            for mut t in &mut text_set.p1() {
                 t.0 = format!(
                     "Dmg: {:.0}  Range: {:.0}\nRate: {:.1}s  MaxLv: {}",
                     tower.damage, tower.range, tower.fire_rate, tower_lv.max_level,
@@ -323,7 +325,7 @@ fn update_tower_info_panel(
             let cost = tower_plugin::upgrade_cost(tower_lv.level, tower.tower_type.cost());
             let can_afford = stats.gold >= cost;
 
-            for mut bg in &mut upgrade_btn {
+            for (mut bg, children) in &mut upgrade_node {
                 *bg = if is_max {
                     BackgroundColor(Color::srgba(0.30, 0.30, 0.30, 0.8))
                 } else if can_afford {
@@ -331,13 +333,15 @@ fn update_tower_info_panel(
                 } else {
                     BackgroundColor(Color::srgba(0.40, 0.20, 0.15, 0.8))
                 };
-            }
-            for mut t in &mut upgrade_label {
-                t.0 = if is_max {
-                    "MAX LEVEL".to_string()
-                } else {
-                    format!("Upgrade ({}g)", cost)
-                };
+                for &child in children.iter() {
+                    if let Ok(mut t) = text_set.p2().get_mut(child) {
+                        t.0 = if is_max {
+                            "MAX LEVEL".to_string()
+                        } else {
+                            format!("Upgrade ({}g)", cost)
+                        };
+                    }
+                }
             }
             return;
         }
