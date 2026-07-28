@@ -1,6 +1,6 @@
 //! Audio Plugin — background music and sound effects mixer.
 
-use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings};
+use bevy::audio::{AudioPlayer, PlaybackSettings};
 use bevy::prelude::*;
 
 use crate::resources::AudioSettings;

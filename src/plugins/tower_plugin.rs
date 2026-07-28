@@ -481,7 +481,7 @@ pub struct TowerRangeCircle;
 fn toggle_tower_ranges(
     keys: Res<ButtonInput<KeyCode>>,
     mut show: ResMut<ShowTowerRanges>,
-    mut range_circles: Query<Entity, With<TowerRangeCircle>>,
+    range_circles: Query<Entity, With<TowerRangeCircle>>,
     mut commands: Commands,
 ) {
     if keys.just_pressed(KeyCode::KeyR) {

@@ -23,7 +23,7 @@ use bevy::prelude::*;
 
 use components::{HitEffect, MainGameCamera, PathFollower, Projectile, SelectionRing, Tower};
 use plugins::{
-    wave_plugin::WaveAnnouncement, CameraPlugin, EnemyPlugin, InputPlugin, MapPlugin,
+    AudioPlugin, CameraPlugin, EnemyPlugin, InputPlugin, MapPlugin,
     ProjectilePlugin, StatusPlugin, TowerPlugin, UiPlugin, VisualPlugin, WavePlugin,
 };
 use resources::{AudioSettings, GameSpeed, GameStats, LevelManager, TextureManager, WaveManager};
@@ -57,7 +57,7 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "Tower Siege: Grid Defense".into(),
-                        resolution: (1280., 720.).into(),
+                        resolution: (1280_f32, 720_f32).into(),
                         resizable: true,
                         ..default()
                     }),
@@ -77,7 +77,7 @@ fn main() {
         // --- States ----------------------------------------------------------
         .init_state::<AppState>()
         // --- Domain plugins --------------------------------------------------
-        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, VisualPlugin, WavePlugin, StatusPlugin, CameraPlugin, UiPlugin))
+        .add_plugins((MapPlugin, EnemyPlugin, InputPlugin, TowerPlugin, ProjectilePlugin, VisualPlugin, WavePlugin, StatusPlugin, CameraPlugin, UiPlugin, AudioPlugin))
         .add_audio_source::<sfx::SfxSource>()
         // --- Bootstrap systems ----------------------------------------------
         .add_event::<sfx::SfxRequest>()

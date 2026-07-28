@@ -4,7 +4,7 @@ use crate::components::{
     Armor, ChainLightningFx, DamageFlash, Enemy, Health, HitEffect, PathFollower, Position,
     Projectile, TowerType,
 };
-use crate::plugins::status_plugin::{apply_burn, apply_slow};
+use crate::plugins::status_plugin::apply_slow;
 use crate::resources::{GameStats, WaveManager};
 use crate::sfx::SfxRequest;
 use crate::AppState;
@@ -30,7 +30,7 @@ fn move_projectiles(
 ) {
     let dt = time.delta_secs();
 
-    for (entity, mut transform, mut projectile, mut position) in &mut projectiles {
+    for (entity, mut transform, projectile, mut position) in &mut projectiles {
         let current = transform.translation.truncate();
 
         let target_pos = if let Some(target) = projectile.target {

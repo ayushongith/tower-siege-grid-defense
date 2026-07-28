@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use crate::components::{BurnDebuff, Enemy, PathFollower, SlowDebuff, StunDebuff};
+use crate::components::{BurnDebuff, Enemy, SlowDebuff, StunDebuff};
 use crate::resources::{GameStats, WaveManager};
 use crate::AppState;
 
