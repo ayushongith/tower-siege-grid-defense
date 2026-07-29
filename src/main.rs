@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! Tower Siege: Grid Defense — Day 1 foundation.
 //!
 //! Day 1 milestone:
